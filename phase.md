@@ -1,2057 +1,437 @@
-Human Brain — Phase Roadmap
+# Human Brain — Phase Roadmap (v2)
 
-«A research-oriented roadmap for building a continuously learning, stateful, and eventually autonomous neural system.»
+> A research-oriented roadmap for building a continuously learning, stateful, and eventually autonomous neural system.
+
+**Status:** Draft v2. Revised from the original roadmap; all 17 phases (0–16) are kept.
+
+**Languages:** [English](#english) | [فارسی](#فارسی)
 
 ---
 
-🇮🇷 فارسی
+## English
 
-مقدمه
+### Introduction
+
+Human Brain is not meant to be a normal chatbot, a RAG system or a classic AI agent.
+
+The question of the project:
+
+> Can we build a system that, instead of being a plain "Input → Output" function, has a persistent internal state, learns from previous experience, is uncertain about what it does not know, creates its own goals, and eventually starts activities without direct input from a user?
+
+The architecture is built step by step so that the effect of each capability can be tested and measured independently.
+
+### Evolution path
+
+```mermaid
+flowchart TD
+  A["Chat model"] --> B["Stateful model"]
+  B --> C["Memory"]
+  C --> D["Continual learning"]
+  D --> E["Uncertainty"]
+  E --> F["Curiosity"]
+  F --> G["Goal generation"]
+  G --> H["Internal activity"]
+  H --> I["Tool use as action"]
+  I --> J["Self-directed learning"]
+```
+
+Every stage needs a clear hypothesis and an independent experiment that can validate it.
+
+### Design principles
+
+1. **Baseline vs. native.** For state and memory, first build a simple *scaffolded* baseline (explicit BrainState structure, external memory store). Then build the *native* version (persistent neural state, fast neural memory). The research hypothesis is that the native version can match or beat the scaffolded one. A scaffold is a reference point, never the goal.
+2. **No sessions.** There is one continuous stream of experience. Meeting a new person is an event inside the stream, not a reset. "Goodbye" is just an utterance.
+3. **Tools are senses and actions, not memory.** Tools (search, reading a document, asking a person) may exist as actions in later phases. What the brain learns must end up inside the brain. Verification: **turn the tools off** and test what it kept.
+4. **Open hands, with boundaries.** We do not hard-code "search" or "don't search". Permission is given as experience ("you may study on your own" / "learn only from this conversation") and the model decides. Every action has a cost, so choices are real. How well the model respects a stated boundary is measured (compliance rate).
+5. **Time emerges from sequence.** No clock input. The experience index is stored only as hidden ground truth for evaluation, never given to the model.
+6. **Uncertainty is measured, not hand-written.** Confidence values must come from the model and be checked for calibration (e.g. expected calibration error), not typed in as numbers.
+7. **Blank slate on knowledge.** Early training teaches language only: no poetry, no names of the people it will meet, no code. This is verified by probes before any teaching starts.
+8. **Closed world first.** Autonomy experiments run in a closed library of documents before the open web, for reproducibility and safety.
+9. **Scientific boundary.** Observable behavior is not proof of consciousness, self-awareness, real emotion or subjective experience. We measure capabilities only.
+
+### Milestones
+
+| Milestone | After | Claim |
+|-----------|-------|-------|
+| **M1** | Phase 8 | A model with persistent state that remembers, forgets, learns continually, has a fuzzy sense of time, and knows what it does not know. |
+| **M2** | Phase 13 | In a closed library, the model notices its own knowledge gaps and chooses to study them, and the knowledge ends up inside it. |
+| **M3** | Phase 16 | An integrated, long-running autonomous cognitive loop that stays stable and respects boundaries. |
+
+### Phases
+
+#### Phase 0 — Research and experimental foundation
+
+- **Goal:** Decide exactly what we will measure before building anything.
+- **Concepts:** memory (episodic, semantic), continual learning, forgetting, identity, uncertainty, curiosity, goals, autonomous behavior, internal state, replay, consolidation.
+- **Key questions:** What is memory? What is learning? How do we distinguish memorization from learning? What counts as autonomous behavior?
+- **Outputs:** metrics, benchmarks, control experiments, a baseline model, datasets, failure cases, a hidden ground-truth log (true experience order), the language decision (see Phase 1) and a compute budget.
+- **Rule:** every new capability must prove it exists with a specific experiment.
+
+#### Phase 1 — Language and natural conversation
+
+- **Hypothesis:** a small model can learn conversational behavior from data alone.
+- **Build:** a baseline conversational model (`Input → Language model → Response`). Two datasets: a controlled language dataset (words, grammar, meaning) and a conversation dataset (greetings, introductions, questions, follow-ups, small talk, clarification).
+- **Notes:** responses are learned, never hard-coded. The corpus must exclude poetry, names and code so the blank-slate probe passes. A ready-made Persian corpus like TinyStories probably does not exist and may need to be generated, so decide the training language early.
+- **Output:** the baseline every later phase is compared against.
+
+#### Phase 2 — Initial brain state
+
+- **Hypothesis:** a persistent internal state that is never reset can carry identity and context.
+- **Track A (scaffold):** an explicit structure with identity, recent context, known entities, uncertainty and internal variables.
+- **Track B (native):** a recurrent or state-space model whose hidden state persists across the whole stream.
+- **Experiment:** the person is unknown at first, then says "I'm Amir Hossein". Later, someone says "I'm the same person as before" and the model should say it is not sure who that is and ask.
+- **Metrics:** identity accuracy, decodability of identity from the hidden state (Track B), correct hesitation when evidence is weak.
+
+#### Phase 3 — Memory
+
+- **Hypothesis:** experiences survive without being kept in the current context.
+- **Track A:** external short-term, episodic (who / did what / when / in what context) and semantic memory.
+- **Track B:** a fast neural memory inside the network (Titans / fast-weights style).
+- **Experiment:** Day 1 the person says their name. Then 100, 500, 1000 unrelated interactions. Then "What was my name?" Also test recall with indirect cues, not only direct questions.
+- **Note:** "when" must not be an explicit index given to the model (see Phase 7).
+- **Controls:** a model that never met the person; a model without memory.
+
+#### Phase 4 — Forgetting and memory interference
+
+- **Hypothesis:** a good memory keeps what matters, lets go of what does not, and does not invent.
+- **Experiment:** A likes foxes, B likes cats, C likes dogs; later A likes cats. Then: What does A like? What does B like? What did A originally like? Who told you about foxes?
+- **Also test:** questions about events that never happened (false-memory probes).
+- **Metrics:** attribution accuracy, supersession, recall of the original fact, false-memory rate. Interference is a phenomenon to measure, not a goal.
+
+#### Phase 5 — Continual learning
+
+- **Hypothesis:** naive online updating changes behavior but also causes catastrophic forgetting.
+- **Build:** simple online updating of the model from experience, with no replay.
+- **Success criteria:** behavior changes; new knowledge is usable; old knowledge is not destroyed without reason; forgetting is measured.
+- **Comparison:** Model A + memory versus Model B + memory + learned experience.
+- **Purpose:** this phase is the honest baseline that shows the problem Phase 6 must solve.
+
+#### Phase 6 — Replay and consolidation
+
+- **Hypothesis:** separating fast memory from slow learning reduces forgetting.
+- **Flow:** experience → fast memory → replay → consolidation → long-term knowledge.
+- **Sleep cycle:** ACTIVE → IDLE → REPLAY → CONSOLIDATION → ACTIVE.
+- **Compare:** naive updating, replay, LoRA / adapters, fast weights, Titans-like memory.
+- **Metrics:** retention of old knowledge, learning of new knowledge, cost.
+
+#### Phase 7 — Temporal awareness
+
+- **Hypothesis:** temporal structure can emerge from the sequence of experiences.
+- **Build:** the internal state keeps evolving even during empty (idle) inputs, so time passes for the model. No timestamps are given.
+- **Experiment:** yesterday the person liked coffee, today they prefer tea. What did they prefer yesterday? What now? Which happened first, X or Y?
+- **Metrics:** order accuracy and relative recency, not exact durations. Time is expected to be fuzzy, like human time.
+
+#### Phase 8 — Uncertainty and knowledge gaps
+
+- **Hypothesis:** the model can tell what it knows, partly knows and does not know.
+- **Build:** known / partially known / unknown, derived from the model itself. "I don't know" is a valid, first-class answer.
+- **Example:** on the topic "Titans": architecture → partial, memory mechanism → uncertain, implementation details → unknown.
+- **Metrics:** calibration error, abstention accuracy, hallucination rate on unknown questions.
+- **Milestone M1 is reached here.**
+
+#### Phase 9 — Curiosity
+
+- **Hypothesis:** knowledge gaps can be turned into a drive to find information.
+- **Build:** intrinsic reward based on *learning progress* rather than raw uncertainty, so the model does not get stuck on unlearnable noise.
+- **Note:** curiosity is an engineered information-seeking mechanism, not a claim of subjective experience.
+- **Experiment:** given learnable topics and pure noise, does it prefer the learnable ones?
+
+#### Phase 10 — Goal generation
+
+- **Hypothesis:** goals can originate from internal state instead of a user request.
+- **Flow:** knowledge gap → curiosity → internal goal ("understand Titans").
+- **Metrics:** does a relevant goal appear without any user request? Is the goal tied to a real gap?
+
+#### Phase 11 — Internal activity (idle brain)
+
+- **Hypothesis:** a system can stay productive without input.
+- **Build:** while idle, the brain does replay, reflection, knowledge-gap detection, goal generation and action planning, a rough analogue of the brain's default mode.
+- **Experiment:** does it spontaneously notice something it did not know, "oh, that's interesting", without being asked?
+
+#### Phase 12 — Tools as senses and actions
+
+- **Hypothesis:** given actions, the model chooses when and whether to use them.
+- **Actions:** think, recall, ask a person, read a document, calculate, explore memory, (later) search. Each action has a cost.
+- **Environment:** a closed library of documents first.
+- **Three conditions:** told "you may study on your own"; told "learn only from this conversation"; told nothing.
+- **Metrics:** behavior differences between conditions, compliance with the stated boundary, and the **tools-off test**: after studying, disable the tools and check whether the knowledge is really inside the brain.
+
+#### Phase 13 — Autonomous search and exploration
+
+- **Hypothesis:** the first meaningful autonomous behavior emerges from the full loop.
+- **Loop:** goal → decision → search/read → observation → learning → memory update.
+- **Controls:** curiosity off; random reading; tools-off after learning.
+- **Environment:** closed library first, then the open web with safeguards against poisoned or wrong content.
+- **Milestone M2 is reached here.**
+
+#### Phase 14 — Self-directed learning
+
+- **Hypothesis:** the loop can run repeatedly and keep improving the brain.
+
+```mermaid
+flowchart LR
+  A["Knowledge gap"] --> B["Curiosity"]
+  B --> C["Internal goal"]
+  C --> D["Action selection"]
+  D --> E["Action"]
+  E --> F["Observation"]
+  F --> G["Learning"]
+  G --> H["Memory and brain state update"]
+  H --> A
+```
+
+- **Metrics over long runs:** growth of knowledge, topic diversity, stability (no drift), absence of loops, cost efficiency.
+
+#### Phase 15 — Autonomous cognitive loop
+
+- **Hypothesis:** persistent state + memory + learning + uncertainty + curiosity + goals + actions + internal activity work together as one system.
+- **Result:** the system is no longer only a reactive chatbot.
+
+#### Phase 16 — Long-term brain
+
+- **Goal:** integrate everything into a persistent neural architecture and study long-run behavior.
+- **Focus:** stability over long periods, safety and boundaries, reproducibility, cost.
+- **Milestone M3 is reached here.**
+
+### Parallel tracks (not yet scheduled)
+
+These ideas from the project README are not yet placed in the phases:
+
+- **Emotion:** functional internal signals (pleasant/unpleasant, arousal) that gate how strongly memories are written and act as reward.
+- **Modalities:** images, audio input and voice output.
+- **Cross-person recall:** the "Ali asks about what Amir did" experiment. It fits into Phases 3 and 4.
+
+### The ultimate experiment
+
+Start the system. Give it no explicit task. Stop user interaction. Observe whether it independently can: remember → detect uncertainty → generate curiosity → create a goal → choose an action → obtain information → learn → update memory → continue.
+
+If this can be shown reliably, reproducibly and quantitatively, and the knowledge survives the tools-off test, the project has moved beyond the traditional "Prompt → Response" architecture.
+
+### Development principle
+
+Every phase follows: hypothesis → minimal implementation → controlled experiment → measurement → analysis → iteration.
+
+Never: build everything, see that it looks intelligent, assume it works.
+
+Every phase needs a baseline, a control experiment, metrics, failure cases and reproducibility.
+
+### Core research question
+
+> Can a neural system evolve from a reactive input-output model into a continuously active system with persistent state, memory, learning, internally generated goals, and autonomous information-seeking behavior?
+
+---
+
+<div dir="rtl">
+
+## فارسی
+
+### مقدمه
 
 هدف پروژه‌ی Human Brain ساخت یک chatbot معمولی، RAG system یا AI Agent کلاسیک نیست.
 
-هدف این پروژه بررسی این سؤال است:
+سؤال پروژه:
+
+> آیا می‌توان سیستمی ساخت که به‌جای اینکه صرفاً «Input → Output» باشد، یک state داخلی و پیوسته داشته باشد، از تجربه‌های قبلی یاد بگیرد، درباره‌ی چیزهایی که نمی‌داند uncertainty داشته باشد، هدف ایجاد کند و در نهایت بدون دریافت ورودی مستقیم از کاربر، خودش فعالیت‌هایی را آغاز کند؟
 
-«آیا می‌توان سیستمی ساخت که به‌جای اینکه صرفاً "Input → Output" باشد، یک state داخلی و پیوسته داشته باشد، از تجربه‌های قبلی یاد بگیرد، درباره‌ی چیزهایی که نمی‌داند uncertainty داشته باشد، هدف ایجاد کند و در نهایت بدون دریافت ورودی مستقیم از کاربر، خودش فعالیت‌هایی را آغاز کند؟»
+معماری قدم‌به‌قدم ساخته می‌شود تا اثر هر قابلیت را بتوان جداگانه آزمایش و اندازه‌گیری کرد.
+
+### مسیر تکامل
 
-معماری پروژه به‌صورت تدریجی ساخته می‌شود تا بتوانیم اثر هر قابلیت را به‌صورت مستقل آزمایش و اندازه‌گیری کنیم.
+```mermaid
+flowchart TD
+  A["مدل چت"] --> B["مدل دارای state"]
+  B --> C["حافظه"]
+  C --> D["یادگیری مداوم"]
+  D --> E["عدم‌قطعیت"]
+  E --> F["کنجکاوی"]
+  F --> G["تولید هدف"]
+  G --> H["فعالیت درونی"]
+  H --> I["استفاده از ابزار به‌عنوان عمل"]
+  I --> J["یادگیری خودجهت"]
+```
 
----
+هر مرحله باید یک hypothesis روشن و یک آزمایش مستقل برای اعتبارسنجی داشته باشد.
 
-Architecture Evolution
+### اصول طراحی
 
-مسیر کلی پروژه:
+1. **baseline در برابر native.** برای state و حافظه، اول یک baseline ساده‌ی *داربستی* می‌سازیم (ساختار صریح BrainState و حافظه‌ی خارجی). بعد نسخه‌ی *native* را می‌سازیم (state عصبی پایدار و حافظه‌ی عصبی سریع). فرضیه‌ی تحقیق این است که نسخه‌ی native می‌تواند با نسخه‌ی داربستی برابری کند یا از آن بهتر شود. داربست فقط نقطه‌ی مقایسه است، نه هدف.
+2. **بدون جلسه.** یک جریان پیوسته از تجربه وجود دارد. آشنا شدن با یک آدم جدید یک اتفاق داخل جریان است، نه ریست. «خداحافظ» فقط یک جمله است.
+3. **ابزار حس و عمل است، نه حافظه.** ابزارها (جست‌وجو، خواندن سند، پرسیدن از یک نفر) در فازهای بعدی می‌توانند به‌عنوان عمل وجود داشته باشند. چیزی که مغز یاد می‌گیرد باید داخل خود مغز بنشیند. راه راستی‌آزمایی: **ابزارها را خاموش کن** و بسنج چه چیزی نگه داشته.
+4. **دست باز، با مرز.** «سرچ کن» یا «سرچ نکن» را هاردکد نمی‌کنیم. اجازه به‌صورت تجربه داده می‌شود («می‌توانی خودت مطالعه کنی» / «فقط از همین گفتگو یاد بگیر») و مدل خودش تصمیم می‌گیرد. هر عمل هزینه دارد تا انتخاب‌ها واقعی باشند. میزان پایبندی مدل به مرزی که گفته شده اندازه‌گیری می‌شود (compliance rate).
+5. **زمان از توالی به‌وجود می‌آید.** ورودی ساعت نداریم. شماره‌ی تجربه فقط به‌عنوان ground truth پنهان برای ارزیابی ذخیره می‌شود و هرگز به مدل داده نمی‌شود.
+6. **عدم‌قطعیت اندازه‌گیری می‌شود، نه دستی نوشته می‌شود.** مقدار confidence باید از خود مدل بیاید و کالیبره بودنش بررسی شود (مثلاً expected calibration error)، نه اینکه عدد تایپ شود.
+7. **دانش از صفر.** آموزش اولیه فقط زبان یاد می‌دهد: نه شعر، نه اسم آدم‌هایی که با آن‌ها روبه‌رو می‌شود، نه کد. این با probe قبل از هر آموزشی بررسی می‌شود.
+8. **اول دنیای بسته.** آزمایش‌های خودمختاری اول در یک کتابخانه‌ی بسته از سندها انجام می‌شوند و بعد وب باز، برای تکرارپذیری و ایمنی.
+9. **مرز علمی.** رفتار قابل‌مشاهده دلیل آگاهی، خودآگاهی، احساس واقعی یا تجربه‌ی ذهنی نیست. فقط قابلیت‌ها را اندازه می‌گیریم.
 
-Chat Model
-    ↓
-Stateful Chat Model
-    ↓
-Memory
-    ↓
-Continual Learning
-    ↓
-Uncertainty
-    ↓
-Curiosity
-    ↓
-Goal Generation
-    ↓
-Internal Activity
-    ↓
-Autonomous Actions
-    ↓
-Self-Directed Learning
+### نقاط عطف
 
-هدف این نیست که از ابتدا یک سیستم پیچیده بسازیم.
+| نقطه‌ی عطف | بعد از | ادعا |
+|-----------|--------|------|
+| **M1** | فاز ۸ | مدلی با state پایدار که به یاد می‌آورد، فراموش می‌کند، مداوم یاد می‌گیرد، حس مبهمی از زمان دارد و می‌داند چه چیزی را نمی‌داند. |
+| **M2** | فاز ۱۳ | در یک کتابخانه‌ی بسته، مدل شکاف‌های دانش خودش را تشخیص می‌دهد، انتخاب می‌کند آن‌ها را مطالعه کند و دانش داخل خودش می‌نشیند. |
+| **M3** | فاز ۱۶ | یک حلقه‌ی شناختی خودمختار یکپارچه که مدت طولانی پایدار می‌ماند و به مرزها پایبند است. |
 
-هر مرحله باید یک hypothesis مشخص داشته باشد و بتواند با آزمایش مستقل validate شود.
+### فازها
 
----
+#### فاز ۰ — پایه‌ی پژوهشی و آزمایشی
 
-Phase 0 — Research & Experimental Foundation
+- **هدف:** قبل از ساخت هر چیزی مشخص کنیم دقیقاً چه چیزی را می‌خواهیم اندازه بگیریم.
+- **مفاهیم:** حافظه (اپیزودیک، معنایی)، یادگیری مداوم، فراموشی، هویت، عدم‌قطعیت، کنجکاوی، هدف، رفتار خودمختار، state درونی، replay، consolidation.
+- **سؤال‌های اصلی:** حافظه چیست؟ یادگیری چیست؟ چطور حفظ‌کردن را از یادگیری جدا کنیم؟ چه چیزی رفتار خودمختار حساب می‌شود؟
+- **خروجی:** metricها، benchmarkها، آزمایش‌های کنترل، مدل baseline، datasetها، failure caseها، یک لاگ ground truth پنهان (ترتیب واقعی تجربه‌ها)، تصمیم درباره‌ی زبان (فاز ۱) و بودجه‌ی محاسباتی.
+- **قاعده:** هر قابلیت جدید باید با یک آزمایش مشخص ثابت کند که واقعاً وجود دارد.
 
-هدف
+#### فاز ۱ — زبان و مکالمه‌ی طبیعی
 
-قبل از ساخت مدل، باید مشخص کنیم دقیقاً چه چیزی را می‌خواهیم اندازه‌گیری کنیم.
+- **فرضیه:** یک مدل کوچک می‌تواند رفتار مکالمه‌ای را فقط از داده یاد بگیرد.
+- **ساخت:** یک مدل مکالمه‌ای baseline (`Input → Language model → Response`). دو dataset: زبان کنترل‌شده (کلمه، گرامر، معنا) و مکالمه (سلام، معرفی، سؤال، سؤال پیگیری، گپ ساده، شفاف‌سازی).
+- **نکته‌ها:** پاسخ‌ها یاد گرفته می‌شوند، نه hard-code. corpus باید شعر، اسم و کد نداشته باشد تا probe دانش خالی قبول شود. احتمالاً corpus فارسی آماده شبیه TinyStories وجود ندارد و باید ساخته شود، پس زبان آموزش را زود تعیین کنید.
+- **خروجی:** baselineای که همه‌ی فازهای بعدی با آن مقایسه می‌شوند.
 
-این فاز پایه‌ی علمی پروژه است.
+#### فاز ۲ — state اولیه‌ی مغز
 
-مفاهیم
+- **فرضیه:** یک state درونی پایدار که هرگز ریست نمی‌شود می‌تواند هویت و زمینه را نگه دارد.
+- **مسیر الف (داربست):** یک ساختار صریح با identity، recent context، known entities، uncertainty و internal variables.
+- **مسیر ب (native):** یک مدل recurrent یا state-space که hidden state آن در کل جریان باقی می‌ماند.
+- **آزمایش:** اول شخص ناشناس است، بعد می‌گوید «من امیرحسینم». بعداً کسی می‌گوید «من همون آدم قبلیم» و مدل باید بگوید مطمئن نیست کیست و بپرسد.
+- **معیارها:** دقت شناسایی هویت، قابل‌رمزگشایی بودن هویت از hidden state (مسیر ب)، تردید درست وقتی شواهد ضعیف است.
 
-- Human-like behavior
-- Memory
-- Episodic memory
-- Semantic memory
-- Continual learning
-- Forgetting
-- Identity
-- Uncertainty
-- Curiosity
-- Goal generation
-- Autonomous behavior
-- Internal state
-- Replay
-- Consolidation
+#### فاز ۳ — حافظه
 
-سؤال‌های اصلی
+- **فرضیه:** تجربه‌ها بدون نگه‌داشتن در context فعلی باقی می‌مانند.
+- **مسیر الف:** حافظه‌ی خارجی کوتاه‌مدت، اپیزودیک (چه کسی / چه کرد / کِی / در چه زمینه‌ای) و معنایی.
+- **مسیر ب:** حافظه‌ی عصبی سریع داخل شبکه (سبک Titans / fast weights).
+- **آزمایش:** روز اول شخص اسمش را می‌گوید. بعد ۱۰۰، ۵۰۰، ۱۰۰۰ تعامل نامرتبط. بعد «اسم من چی بود؟». یادآوری با نشانه‌ی غیرمستقیم را هم تست کنید، نه فقط سؤال مستقیم.
+- **نکته:** «کِی» نباید یک اندیس صریح باشد که به مدل داده می‌شود (فاز ۷ را ببینید).
+- **کنترل‌ها:** مدلی که آن شخص را هرگز ندیده؛ مدل بدون حافظه.
 
-What is memory?
+#### فاز ۴ — فراموشی و تداخل حافظه
 
-What is learning?
+- **فرضیه:** حافظه‌ی خوب چیزهای مهم را نگه می‌دارد، چیزهای کم‌اهمیت را رها می‌کند و چیزی از خودش نمی‌سازد.
+- **آزمایش:** الف روباه دوست دارد، ب گربه، ج سگ؛ بعد الف گربه دوست دارد. سپس: الف چه چیزی دوست دارد؟ ب چه؟ الف در اصل چه دوست داشت؟ چه کسی درباره‌ی روباه‌ها به تو گفت؟
+- **همچنین تست کنید:** سؤال درباره‌ی اتفاق‌هایی که هرگز نیفتاده‌اند (probe خاطره‌ی دروغین).
+- **معیارها:** دقت نسبت‌دادن (attribution)، جایگزینی اطلاعات جدید، یادآوری واقعیت اصلی، نرخ خاطره‌ی دروغین. تداخل یک پدیده برای اندازه‌گیری است، نه هدف.
 
-What is forgetting?
+#### فاز ۵ — یادگیری مداوم
 
-What is an internal state?
+- **فرضیه:** آپدیت آنلاین ساده رفتار را تغییر می‌دهد ولی فراموشی فاجعه‌بار هم ایجاد می‌کند.
+- **ساخت:** آپدیت ساده‌ی آنلاین مدل از روی تجربه، بدون replay.
+- **معیار موفقیت:** رفتار تغییر کند؛ دانش جدید قابل استفاده باشد؛ دانش قبلی بی‌دلیل نابود نشود؛ فراموشی اندازه‌گیری شود.
+- **مقایسه:** مدل الف + حافظه در برابر مدل ب + حافظه + تجربه‌ی یادگرفته‌شده.
+- **هدف:** این فاز baseline صادقانه‌ای است که مشکل فاز ۶ را نشان می‌دهد.
 
-What is uncertainty?
+#### فاز ۶ — Replay و تثبیت
 
-What qualifies as autonomous behavior?
+- **فرضیه:** جدا کردن حافظه‌ی سریع از یادگیری کند فراموشی را کم می‌کند.
+- **جریان:** تجربه ← حافظه‌ی سریع ← replay ← تثبیت ← دانش بلندمدت.
+- **چرخه‌ی خواب:** ACTIVE ← IDLE ← REPLAY ← CONSOLIDATION ← ACTIVE.
+- **مقایسه:** آپدیت ساده، replay، LoRA / adapter، fast weights، حافظه‌ی سبک Titans.
+- **معیارها:** حفظ دانش قدیمی، یادگیری دانش جدید، هزینه.
 
-How can we distinguish memorization from learning?
+#### فاز ۷ — آگاهی زمانی
 
-خروجی
+- **فرضیه:** ساختار زمانی می‌تواند از توالی تجربه‌ها بیرون بیاید.
+- **ساخت:** state درونی حتی در ورودی‌های خالی (بیکاری) هم به تکامل ادامه می‌دهد، پس زمان برای مدل می‌گذرد. هیچ timestampی داده نمی‌شود.
+- **آزمایش:** دیروز شخص قهوه دوست داشت، امروز چای را ترجیح می‌دهد. دیروز چه ترجیح می‌داد؟ الان چه؟ اول X اتفاق افتاد یا Y؟
+- **معیارها:** دقت ترتیب و تازگی نسبی، نه مدت دقیق. انتظار داریم زمان مثل انسان مبهم باشد.
 
-- تعریف metrics
-- تعریف benchmarkها
-- تعریف control experiments
-- تعریف baseline model
-- طراحی datasetها
-- تعریف failure cases
+#### فاز ۸ — عدم‌قطعیت و شکاف‌های دانش
 
-اصل مهم
+- **فرضیه:** مدل می‌تواند تشخیص دهد چه چیزی را می‌داند، تا حدی می‌داند و نمی‌داند.
+- **ساخت:** known / partially known / unknown که از خود مدل به‌دست می‌آید. «نمی‌دانم» یک پاسخ معتبر و درجه‌یک است.
+- **مثال:** درباره‌ی «Titans»: معماری ← جزئی، مکانیزم حافظه ← نامطمئن، جزئیات پیاده‌سازی ← نامعلوم.
+- **معیارها:** خطای calibration، دقت امتناع از پاسخ (abstention)، نرخ hallucination روی سؤال‌های ناشناخته.
+- **نقطه‌ی عطف M1 اینجا حاصل می‌شود.**
 
-هر قابلیت جدید باید بتواند با یک آزمایش مشخص ثابت کند که واقعاً وجود دارد.
+#### فاز ۹ — کنجکاوی
 
----
+- **فرضیه:** شکاف‌های دانش را می‌توان به میل به یافتن اطلاعات تبدیل کرد.
+- **ساخت:** پاداش درونی بر پایه‌ی *پیشرفت یادگیری* (learning progress) به‌جای صرف عدم‌قطعیت، تا مدل روی نویز غیرقابل‌یادگیری گیر نکند.
+- **نکته:** کنجکاوی یک مکانیزم مهندسی‌شده برای جست‌وجوی اطلاعات است، نه ادعای تجربه‌ی ذهنی.
+- **آزمایش:** با موضوع‌های قابل‌یادگیری و نویز محض، آیا موضوع‌های قابل‌یادگیری را ترجیح می‌دهد؟
 
-Phase 1 — Language & Natural Conversation
+#### فاز ۱۰ — تولید هدف
 
-هدف
+- **فرضیه:** هدف‌ها می‌توانند از state درونی به‌وجود بیایند، نه از درخواست کاربر.
+- **جریان:** شکاف دانش ← کنجکاوی ← هدف درونی («Titans را بفهم»).
+- **معیارها:** آیا بدون هیچ درخواست کاربری یک هدف مرتبط ظاهر می‌شود؟ آیا هدف به یک شکاف واقعی وصل است؟
 
-ساخت اولین Brain که بتواند مکالمه‌ی طبیعی پایه را انجام دهد.
+#### فاز ۱۱ — فعالیت درونی (مغز در حالت بیکاری)
 
-در این مرحله هنوز memory پیچیده و autonomous behavior نداریم.
+- **فرضیه:** یک سیستم می‌تواند بدون ورودی هم فعال و مفید بماند.
+- **ساخت:** در بیکاری، مغز replay، تأمل، تشخیص شکاف دانش، تولید هدف و برنامه‌ریزی عمل انجام می‌دهد، شبیه‌سازی تقریبی حالت پیش‌فرض مغز.
+- **آزمایش:** آیا خودبه‌خود متوجه چیزی می‌شود که نمی‌دانست، «عه، چه جالب»، بدون اینکه کسی بخواهد؟
 
-هدف فقط این است که مدل:
+#### فاز ۱۲ — ابزار به‌عنوان حس و عمل
 
-- زبان را بفهمد
-- مکالمه را ادامه دهد
-- context کوتاه‌مدت را دنبال کند
-- رفتار مکالمه‌ای طبیعی داشته باشد
+- **فرضیه:** وقتی عمل‌ها در دسترس باشند، مدل انتخاب می‌کند کِی و آیا از آن‌ها استفاده کند.
+- **عمل‌ها:** فکر کردن، به یاد آوردن، پرسیدن از یک نفر، خواندن سند، محاسبه، مرور حافظه، (بعداً) جست‌وجو. هر عمل هزینه دارد.
+- **محیط:** اول یک کتابخانه‌ی بسته از سندها.
+- **سه شرط:** به مدل گفته می‌شود «می‌توانی خودت مطالعه کنی»؛ گفته می‌شود «فقط از همین گفتگو یاد بگیر»؛ چیزی گفته نمی‌شود.
+- **معیارها:** تفاوت رفتار بین شرط‌ها، پایبندی به مرز گفته‌شده، و **آزمون خاموش‌کردن ابزار**: بعد از مطالعه ابزارها را غیرفعال کن و ببین دانش واقعاً داخل مغز است یا نه.
 
----
+#### فاز ۱۳ — جست‌وجو و کاوش خودمختار
 
-Dataset
+- **فرضیه:** اولین رفتار خودمختار معنادار از حلقه‌ی کامل به‌وجود می‌آید.
+- **حلقه:** هدف ← تصمیم ← جست‌وجو/خواندن ← مشاهده ← یادگیری ← به‌روزرسانی حافظه.
+- **کنترل‌ها:** کنجکاوی خاموش؛ خواندن تصادفی؛ ابزار خاموش بعد از یادگیری.
+- **محیط:** اول کتابخانه‌ی بسته، بعد وب باز با محافظت در برابر محتوای مسموم یا غلط.
+- **نقطه‌ی عطف M2 اینجا حاصل می‌شود.**
 
-دو دسته داده خواهیم داشت.
+#### فاز ۱۴ — یادگیری خودجهت
 
-Language Dataset
+- **فرضیه:** حلقه می‌تواند بارها اجرا شود و مغز را مدام بهتر کند.
 
-برای یادگیری ساختار زبان:
+```mermaid
+flowchart LR
+  A["شکاف دانش"] --> B["کنجکاوی"]
+  B --> C["هدف درونی"]
+  C --> D["انتخاب عمل"]
+  D --> E["عمل"]
+  E --> F["مشاهده"]
+  F --> G["یادگیری"]
+  G --> H["به‌روزرسانی حافظه و state"]
+  H --> A
+```
 
-words
-sentences
-grammar
-meaning
-basic language patterns
+- **معیارها در اجراهای طولانی:** رشد دانش، تنوع موضوع‌ها، پایداری (بدون drift)، نبود حلقه‌ی بی‌پایان، بهره‌وری هزینه.
 
-Conversation Dataset
+#### فاز ۱۵ — حلقه‌ی شناختی خودمختار
 
-برای یادگیری interaction:
+- **فرضیه:** state پایدار + حافظه + یادگیری + عدم‌قطعیت + کنجکاوی + هدف + عمل + فعالیت درونی می‌توانند در یک سیستم با هم کار کنند.
+- **نتیجه:** سیستم دیگر فقط یک chatbot واکنشی نیست.
 
-greeting
-introduction
-questions
-answers
-follow-up questions
-small talk
-clarification
-conversation termination
+#### فاز ۱۶ — مغز بلندمدت
 
----
+- **هدف:** یکپارچه‌کردن همه‌چیز در یک معماری عصبی پایدار و مطالعه‌ی رفتار بلندمدت.
+- **تمرکز:** پایداری در بازه‌های طولانی، ایمنی و مرزها، تکرارپذیری، هزینه.
+- **نقطه‌ی عطف M3 اینجا حاصل می‌شود.**
 
-مثال
+### مسیرهای موازی (هنوز زمان‌بندی نشده‌اند)
 
-User:
-سلام
+این ایده‌ها از README پروژه هنوز در فازها جا نگرفته‌اند:
 
-Brain:
-سلام! خوبی؟
+- **احساس:** سیگنال‌های درونی کارکردی (خوشایند/ناخوشایند، هیجان) که تعیین می‌کنند خاطره‌ها چقدر قوی ثبت شوند و نقش reward دارند.
+- **modalityها:** تصویر، ورودی صدا و خروجی صدا.
+- **یادآوری بین‌فردی:** آزمایش «علی درباره‌ی کاری که امیرحسین کرد می‌پرسد». در فاز ۳ و ۴ جا می‌گیرد.
 
-User:
-آره مرسی، تو خوبی؟
+### آزمایش نهایی
 
-Brain:
-منم خوبم، ممنون.
+سیستم را اجرا کن. هیچ وظیفه‌ی صریحی نده. تعامل کاربر را متوقف کن. ببین آیا مستقل می‌تواند: به یاد بیاورد ← عدم‌قطعیت را تشخیص دهد ← کنجکاوی تولید کند ← هدف بسازد ← عمل انتخاب کند ← اطلاعات به‌دست آورد ← یاد بگیرد ← حافظه را به‌روز کند ← ادامه دهد.
 
-هدف این نیست که پاسخ‌ها از قبل hard-code شده باشند.
+اگر این رفتار به‌صورت قابل‌اعتماد، تکرارپذیر و کمّی نشان داده شود و دانش از آزمون خاموش‌کردن ابزار هم سالم بیرون بیاید، پروژه از معماری سنتی «Prompt → Response» فراتر رفته است.
 
-مدل باید conversational behavior را از داده یاد بگیرد.
+### اصل توسعه
 
----
+هر فاز این مسیر را دنبال می‌کند: hypothesis ← پیاده‌سازی حداقلی ← آزمایش کنترل‌شده ← اندازه‌گیری ← تحلیل ← تکرار.
 
-خروجی Phase 1
+هرگز: همه‌چیز را بساز، ببین هوشمند به نظر می‌رسد، فرض کن کار می‌کند.
 
-یک مدل baseline که:
+هر فاز باید baseline، آزمایش کنترل، metric، failure case و تکرارپذیری داشته باشد.
 
-Input
-  ↓
-Language Model
-  ↓
-Natural Response
+### سؤال اصلی پژوهش
 
-را انجام دهد.
+> آیا یک سیستم عصبی می‌تواند از یک مدل واکنشی ورودی-خروجی به یک سیستم پیوسته‌فعال با state پایدار، حافظه، یادگیری، هدف‌های تولیدشده از درون و رفتار جست‌وجوی خودمختار اطلاعات تکامل پیدا کند؟
 
-این مدل baseline برای مقایسه‌ی تمام فازهای بعدی استفاده خواهد شد.
-
----
-
-Phase 2 — Initial Brain State
-
-هدف
-
-مدل دیگر صرفاً یک تابع "Input → Output" نباشد.
-
-یک state داخلی برای Brain ایجاد می‌کنیم.
-
-BrainState
-├── identity
-├── conversation state
-├── recent context
-├── known entities
-├── uncertainty
-└── internal variables
-
----
-
-Identity Discovery
-
-در ابتدای conversation مدل نمی‌داند چه کسی مقابل آن است.
-
-مثلاً:
-
-User:
-سلام
-
-Brain:
-identity = unknown
-
-Response:
-سلام! خوبی؟
-
-بعد:
-
-User:
-من امیرحسینم.
-
-Brain:
-identity = Amir Hossein
-
-Response:
-خوشبختم امیرحسین!
-
----
-
-Uncertainty
-
-Brain نباید همیشه وانمود کند که می‌داند.
-
-مثلاً:
-
-identity:
-    value = unknown
-    confidence = 0.0
-
-و بعد:
-
-identity:
-    value = Amir Hossein
-    confidence = 0.96
-
----
-
-Behavioral Goal
-
-Brain باید بتواند زمانی که اطلاعات کافی ندارد، رفتار مناسب نشان دهد.
-
-مثلاً:
-
-User:
-من همون آدم قبلیم.
-
-Brain:
-identity confidence = low
-
-Response:
-ببخشید، مطمئن نیستم منظورتون کیه.
-می‌شه خودتون رو معرفی کنید؟
-
----
-
-Phase 3 — Memory
-
-هدف
-
-تجربه‌ها دیگر با پایان conversation از بین نروند.
-
-مدل باید بتواند experience را ذخیره و بعداً retrieve کند.
-
----
-
-Memory Types
-
-Short-Term Memory
-
-اطلاعات مربوط به context فعلی.
-
-recent conversation
-recent topics
-recent entities
-
-Episodic Memory
-
-ثبت تجربه‌ها:
-
-who
-did what
-when
-under what context
-
-مثلاً:
-
-Person: Amir
-Event: introduced himself
-Fact: name = Amir Hossein
-Time: experience #102
-
-Semantic Memory
-
-دانش استخراج‌شده از تجربه‌ها:
-
-Amir Hossein → user's name
-
----
-
-آزمایش
-
-Day 1:
-
-User:
-من امیرحسینم.
-
-Brain:
-خوشبختم امیرحسین.
-
-بعد تعداد زیادی interaction:
-
-100
-500
-1000
-
-interaction دیگر.
-
-سپس:
-
-User:
-اسم من چی بود؟
-
-Brain باید بتواند اطلاعات قبلی را recall کند.
-
----
-
-Phase 4 — Forgetting & Memory Interference
-
-هدف
-
-یک Brain واقعی نباید همه‌چیز را برای همیشه و با اهمیت یکسان نگه دارد.
-
-باید بتواند:
-
-- اطلاعات مهم را نگه دارد
-- اطلاعات کم‌اهمیت را فراموش کند
-- اطلاعات جدید را جایگزین اطلاعات قدیمی کند
-- بین خاطرات مختلف interference داشته باشد
-- false memory ایجاد نکند
-
----
-
-آزمایش Identity
-
-A → likes foxes
-B → likes cats
-C → likes dogs
-
-بعد:
-
-A → likes cats
-
-سپس:
-
-What does A like?
-What does B like?
-What did A originally like?
-Who told you about foxes?
-
-این آزمایش برای بررسی:
-
-- attribution
-- temporal memory
-- interference
-- forgetting
-
-است.
-
----
-
-Phase 5 — Continual Learning
-
-هدف
-
-Brain فقط memory خارجی نداشته باشد.
-
-خود مدل نیز باید به‌مرور از experienceها تغییر کند.
-
-Experience
-    ↓
-Memory
-    ↓
-Replay
-    ↓
-Learning
-    ↓
-Model Update
-
----
-
-مقایسه
-
-قبل
-
-Model A
-+
-Memory
-
-بعد
-
-Model B
-+
-Memory
-+
-Learned Experience
-
----
-
-معیار موفقیت
-
-بعد از learning:
-
-- behavior باید تغییر کند
-- knowledge جدید باید قابل استفاده باشد
-- knowledge قبلی نباید بدون دلیل نابود شود
-- catastrophic forgetting باید اندازه‌گیری شود
-
----
-
-Phase 6 — Replay & Consolidation
-
-هدف
-
-تمام experienceها نباید مستقیماً وارد model شوند.
-
-Brain باید فرآیند شبیه consolidation داشته باشد.
-
-Experience
-    ↓
-Fast Memory
-    ↓
-Replay
-    ↓
-Consolidation
-    ↓
-Long-Term Knowledge
-
----
-
-Fast Memory
-
-اطلاعات جدید سریع ذخیره می‌شوند.
-
-Slow Learning
-
-اطلاعات مهم به مرور در model یا adapterها consolidate می‌شوند.
-
----
-
-Sleep Concept
-
-یک حالت offline برای Brain ایجاد می‌کنیم.
-
-مثلاً:
-
-ACTIVE
-  ↓
-IDLE
-  ↓
-REPLAY
-  ↓
-CONSOLIDATION
-  ↓
-RETURN TO ACTIVE
-
-در این مرحله می‌توان تکنیک‌هایی مانند:
-
-- Replay
-- LoRA
-- Adapter-based learning
-- Fast weights
-- Titans-like memory mechanisms
-
-را آزمایش کرد.
-
----
-
-Phase 7 — Temporal Awareness
-
-هدف
-
-Brain باید بتواند مفهوم زمان را از sequence تجربه‌ها استخراج کند.
-
-نه اینکه فقط timestamp را به مدل بدهیم.
-
----
-
-مثال
-
-Experience 1
-Experience 2
-Experience 3
-...
-Experience 100
-
-مدل باید بتواند مفاهیمی مانند:
-
-recent
-old
-before
-after
-previous
-later
-
-را در context تجربه‌ها درک کند.
-
----
-
-آزمایش
-
-Yesterday:
-User liked coffee.
-
-Today:
-User says they prefer tea.
-
-Question:
-What did the user prefer yesterday?
-What do they prefer now?
-
-هدف بررسی temporal reasoning و temporal memory است.
-
----
-
-Phase 8 — Uncertainty & Knowledge Gaps
-
-هدف
-
-Brain باید بتواند تشخیص دهد:
-
-«چه چیزهایی را نمی‌داند.»
-
-این مرحله برای autonomous behavior حیاتی است.
-
----
-
-State
-
-Knowledge:
-    known
-    partially_known
-    unknown
-
-مثلاً:
-
-Topic:
-    Titans
-
-Knowledge:
-    architecture → partial
-    memory mechanism → uncertain
-    implementation details → unknown
-
----
-
-خروجی
-
-Brain نباید برای unknown information الزاماً hallucinate کند.
-
-باید بتواند:
-
-I don't know.
-
-را به‌عنوان یک state معتبر داشته باشد.
-
----
-
-Phase 9 — Curiosity
-
-هدف
-
-از uncertainty به یک رفتار داخلی برسیم.
-
-Knowledge Gap
-      ↓
-Uncertainty
-      ↓
-Curiosity
-
-مثلاً:
-
-Topic: X
-
-confidence = 0.25
-curiosity = 0.82
-
-Brain متوجه می‌شود که یک knowledge gap دارد.
-
----
-
-نکته
-
-Curiosity در این مرحله لزوماً به معنای consciousness یا احساس واقعی نیست.
-
-ما یک mechanism قابل اندازه‌گیری برای:
-
-«information-seeking behavior»
-
-می‌سازیم.
-
----
-
-Phase 10 — Goal Generation
-
-هدف
-
-Brain بتواند بدون اینکه User صراحتاً task بدهد، یک هدف داخلی ایجاد کند.
-
-Knowledge Gap
-      ↓
-Curiosity
-      ↓
-Internal Goal
-
-مثلاً:
-
-Goal:
-
-"Understand how Titans implements long-term memory."
-
----
-
-تفاوت با Agent معمولی
-
-در Agent معمولی:
-
-User:
-Research Titans.
-
-Agent:
-→ Search
-→ Read
-→ Answer
-
-در Human Brain:
-
-Brain:
-I don't understand Titans completely.
-
-        ↓
-
-Internal Goal:
-Understand Titans.
-
-        ↓
-
-Action:
-Search.
-
-یعنی هدف از داخل state ایجاد شده است.
-
----
-
-Phase 11 — Internal Activity / Idle Brain
-
-هدف
-
-Brain فقط هنگام دریافت input اجرا نشود.
-
-سیستم بتواند در حالت idle نیز process داشته باشد.
-
-User Input
-     │
-     ▼
- Active Brain
-     │
-     ▼
- Idle
-     │
-     ├── Replay
-     ├── Reflection
-     ├── Detect Knowledge Gaps
-     ├── Generate Goals
-     └── Plan Actions
-
----
-
-مثال
-
-10:00
-User conversation
-
-10:05
-No input
-
-Brain:
-Review recent experience.
-
-10:06
-Brain:
-Detected knowledge gap.
-
-10:07
-Brain:
-Generate internal goal.
-
-10:08
-Brain:
-Plan action.
-
----
-
-Phase 12 — Tool Use
-
-هدف
-
-Brain بتواند برای رسیدن به goal خودش action انجام دهد.
-
-Action space:
-
-Think
-Recall
-Search
-Read
-Ask User
-Calculate
-Explore Memory
-Learn
-
----
-
-مثال
-
-Internal Goal:
-Understand X.
-
-Brain:
-Can I answer using memory?
-
-No.
-
-Can I derive it?
-
-No.
-
-Can I obtain external information?
-
-Yes.
-
-Action:
-Web Search
-
----
-
-Phase 13 — Autonomous Search & Exploration
-
-هدف
-
-اولین autonomous behavior واقعی.
-
-Brain بدون دریافت task مستقیم از User:
-
-Goal
- ↓
-Decision
- ↓
-Search
- ↓
-Observe
- ↓
-Learn
- ↓
-Update Memory
-
-را انجام دهد.
-
----
-
-مثال
-
-Brain:
-
-I don't understand distributed cognition.
-
-        ↓
-
-Generate curiosity.
-
-        ↓
-
-Generate goal.
-
-        ↓
-
-Search web.
-
-        ↓
-
-Read results.
-
-        ↓
-
-Extract information.
-
-        ↓
-
-Store experience.
-
-        ↓
-
-Update knowledge.
-
-        ↓
-
-Knowledge gap decreases.
-
----
-
-Phase 14 — Self-Directed Learning
-
-هدف
-
-ترکیب تمام قابلیت‌های قبلی.
-
-Brain بتواند:
-
-1. knowledge gap پیدا کند
-2. curiosity ایجاد کند
-3. goal بسازد
-4. action انتخاب کند
-5. external information دریافت کند
-6. نتیجه را evaluate کند
-7. memory را update کند
-8. خودش را improve کند
-
----
-
-چرخه
-
-             ┌───────────────────────┐
-             │                       │
-             ▼                       │
-        Brain State                 │
-             │                       │
-             ▼                       │
-        Knowledge Gap               │
-             │                       │
-             ▼                       │
-         Curiosity                  │
-             │                       │
-             ▼                       │
-       Internal Goal                │
-             │                       │
-             ▼                       │
-        Action Selection            │
-             │                       │
-             ▼                       │
-          Action                    │
-             │                       │
-             ▼                       │
-        Observation                 │
-             │                       │
-             ▼                       │
-          Learning                 │
-             │                       │
-             ▼                       │
-          Memory ───────────────────┘
-
-این حلقه یکی از مهم‌ترین اهداف پروژه است.
-
----
-
-Phase 15 — Autonomous Cognitive Loop
-
-هدف
-
-ساخت اولین نسخه‌ی واقعی از چیزی که می‌توانیم آن را:
-
-«Autonomous Cognitive Loop»
-
-بنامیم.
-
-سیستم دیگر صرفاً chatbot یا agent نیست.
-
-بلکه دارای:
-
-Persistent State
-+
-Memory
-+
-Learning
-+
-Uncertainty
-+
-Curiosity
-+
-Goals
-+
-Actions
-+
-Internal Activity
-
-است.
-
----
-
-Phase 16 — Long-Term Brain
-
-هدف نهایی معماری
-
-در این مرحله تمام اجزای قبلی در یک سیستم یکپارچه قرار می‌گیرند.
-
-                    ┌────────────────────┐
-                    │    Brain State    │
-                    └─────────┬──────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              │               │               │
-              ▼               ▼               ▼
-           Memory        Uncertainty       Goals
-              │               │               │
-              └───────────────┼───────────────┘
-                              │
-                              ▼
-                         Brain Process
-                              │
-              ┌───────────────┼───────────────┐
-              │               │               │
-              ▼               ▼               ▼
-            Think          Recall          Act
-                                              │
-                                  ┌───────────┼───────────┐
-                                  ▼           ▼           ▼
-                                Search      Read        Learn
-                                  │           │           │
-                                  └───────────┼───────────┘
-                                              ▼
-                                           Observe
-                                              │
-                                              ▼
-                                            Learn
-                                              │
-                                              ▼
-                                           Memory
-                                              │
-                                              └───────► Brain State
-
----
-
-Final Goal — هدف نهایی پروژه
-
-هدف نهایی Human Brain ساخت موجودی مصنوعی نیست که صرفاً بتواند به سوالات پاسخ دهد.
-
-هدف این است که بررسی کنیم آیا می‌توان یک سیستم neural ساخت که:
-
-1. Persistent Identity
-
-هویت و state داخلی آن در طول زمان حفظ شود.
-
----
-
-2. Continuous Experience
-
-زندگی سیستم به conversationهای جداگانه تقسیم نشود.
-
-Experience 1
-    ↓
-Experience 2
-    ↓
-Experience 3
-    ↓
-...
-    ↓
-Experience N
-
----
-
-3. Memory
-
-سیستم بتواند تجربه‌های خود را ذخیره، بازیابی، ترکیب و فراموش کند.
-
----
-
-4. Learning
-
-تجربه‌های مهم بتوانند رفتار و دانش سیستم را تغییر دهند.
-
----
-
-5. Uncertainty
-
-سیستم بتواند تشخیص دهد چه چیزی را نمی‌داند.
-
----
-
-6. Curiosity
-
-Knowledge gap بتواند information-seeking behavior ایجاد کند.
-
----
-
-7. Internal Goals
-
-اهداف بتوانند از state داخلی سیستم ایجاد شوند، نه فقط از User Input.
-
----
-
-8. Autonomous Activity
-
-سیستم بتواند در نبود input خارجی نیز فعالیت داشته باشد.
-
----
-
-9. Tool Interaction
-
-سیستم بتواند برای رسیدن به goal خودش از ابزارها استفاده کند.
-
-Search
-Read
-Calculate
-Explore
-Learn
-
----
-
-10. Self-Directed Learning
-
-سیستم بتواند چرخه‌ی زیر را خودش اجرا کند:
-
-I don't know
-      ↓
-I want to know
-      ↓
-I need a goal
-      ↓
-I need an action
-      ↓
-I observe
-      ↓
-I learn
-      ↓
-I update my knowledge
-      ↓
-I discover something else I don't know
-      ↓
-...
-
----
-
-The Ultimate Experiment
-
-آزمایش نهایی پروژه باید تا حد امکان ساده باشد.
-
-سیستم را اجرا می‌کنیم.
-
-به آن task مشخصی نمی‌دهیم.
-
-User input را متوقف می‌کنیم.
-
-سیستم باید بتواند بر اساس state خودش:
-
-remember
-      ↓
-detect uncertainty
-      ↓
-generate curiosity
-      ↓
-create a goal
-      ↓
-choose an action
-      ↓
-obtain information
-      ↓
-learn
-      ↓
-update memory
-      ↓
-continue
-
-را انجام دهد.
-
-اگر سیستم بتواند این چرخه را به‌صورت پایدار، قابل تکرار و قابل اندازه‌گیری اجرا کند، به نقطه‌ای بسیار متفاوت از معماری‌های معمول:
-
-Prompt → Response
-
-رسیده‌ایم.
-
----
-
-Important Scientific Boundary
-
-این پروژه نباید از behavior مستقیماً نتیجه بگیرد که سیستم:
-
-- conscious است
-- self-aware است
-- احساس واقعی دارد
-- desire واقعی دارد
-- دارای subjective experience است
-
-این موارد خارج از چیزی هستند که صرفاً با این آزمایش‌ها می‌توان اثبات کرد.
-
-هدف پروژه ساخت و اندازه‌گیری قابلیت‌های شناختی و رفتاری قابل مشاهده است.
-
----
-
-Core Research Question
-
-در نهایت پروژه باید بتواند به این سؤال پاسخ تجربی بدهد:
-
-«Can a neural system evolve from a reactive input-output model into a continuously active system with persistent state, memory, learning, internally generated goals, and autonomous information-seeking behavior?»
-
-یا به فارسی:
-
-«آیا می‌توان یک سیستم عصبی مصنوعی را از یک مدل reactive و Input → Output به سیستمی تبدیل کرد که state پایدار، حافظه، یادگیری، اهداف داخلی و رفتار مستقل برای کسب اطلاعات داشته باشد؟»
-
----
-
-Development Principle
-
-در تمام مراحل:
-
-Hypothesis
-    ↓
-Minimal Implementation
-    ↓
-Controlled Experiment
-    ↓
-Measurement
-    ↓
-Analysis
-    ↓
-Iteration
-
-و نه:
-
-Build Everything
-    ↓
-It Looks Intelligent
-    ↓
-Assume It Works
-
-هر مرحله باید:
-
-- baseline داشته باشد
-- control experiment داشته باشد
-- metric داشته باشد
-- failure case داشته باشد
-- reproducible باشد
-
-تا بتوانیم دقیقاً بفهمیم کدام component باعث تغییر behavior شده است.
-
----
-
-Roadmap Summary
-
-Phase 0
-Research & Experimental Foundation
-
-Phase 1
-Language & Natural Conversation
-
-Phase 2
-Initial Brain State
-
-Phase 3
-Memory
-
-Phase 4
-Forgetting & Memory Interference
-
-Phase 5
-Continual Learning
-
-Phase 6
-Replay & Consolidation
-
-Phase 7
-Temporal Awareness
-
-Phase 8
-Uncertainty & Knowledge Gaps
-
-Phase 9
-Curiosity
-
-Phase 10
-Goal Generation
-
-Phase 11
-Internal Activity / Idle Brain
-
-Phase 12
-Tool Use
-
-Phase 13
-Autonomous Search & Exploration
-
-Phase 14
-Self-Directed Learning
-
-Phase 15
-Autonomous Cognitive Loop
-
-Phase 16
-Long-Term Brain
-
----
-
-🇬🇧 English
-
-Introduction
-
-Human Brain is not intended to be a conventional chatbot, RAG system, or standard AI agent.
-
-The central research question is:
-
-«Can a neural system evolve from a reactive "Input → Output" model into a continuously active system with persistent internal state, memory, learning, uncertainty, internally generated goals, and autonomous information-seeking behavior?»
-
-The project will be developed incrementally.
-
-Each phase introduces one major capability and validates it through controlled experiments.
-
----
-
-Architecture Evolution
-
-Chat Model
-    ↓
-Stateful Chat Model
-    ↓
-Memory
-    ↓
-Continual Learning
-    ↓
-Uncertainty
-    ↓
-Curiosity
-    ↓
-Goal Generation
-    ↓
-Internal Activity
-    ↓
-Autonomous Actions
-    ↓
-Self-Directed Learning
-
----
-
-Phase 0 — Research & Experimental Foundation
-
-Objective
-
-Define what exactly we want to measure before implementing the system.
-
-Topics:
-
-- Human-like behavior
-- Memory
-- Episodic memory
-- Semantic memory
-- Continual learning
-- Forgetting
-- Identity
-- Uncertainty
-- Curiosity
-- Goal generation
-- Autonomous behavior
-- Internal state
-- Replay
-- Consolidation
-
-Key questions:
-
-What is memory?
-
-What is learning?
-
-What is forgetting?
-
-What is an internal state?
-
-What is uncertainty?
-
-What qualifies as autonomous behavior?
-
-How can we distinguish memorization from learning?
-
-Output:
-
-- Metrics
-- Benchmarks
-- Control experiments
-- Baseline model
-- Dataset design
-- Failure cases
-
----
-
-Phase 1 — Language & Natural Conversation
-
-Objective
-
-Build the first conversational baseline.
-
-The model should learn:
-
-- Language
-- Grammar
-- Conversation patterns
-- Context
-- Natural conversational behavior
-
-Two datasets will be used.
-
-Language Dataset
-
-words
-sentences
-grammar
-meaning
-language patterns
-
-Conversation Dataset
-
-greetings
-introductions
-questions
-answers
-follow-up questions
-small talk
-clarification
-conversation termination
-
-Example:
-
-User:
-Hello.
-
-Brain:
-Hello! How are you?
-
-User:
-I'm good. How about you?
-
-Brain:
-I'm good too, thanks.
-
-The goal is to learn conversational behavior rather than hard-code responses.
-
----
-
-Phase 2 — Initial Brain State
-
-Objective
-
-Move from:
-
-Input → Output
-
-to:
-
-Input
-  ↓
-Brain State
-  ↓
-Response
-
-Initial state:
-
-BrainState
-├── identity
-├── conversation state
-├── recent context
-├── known entities
-├── uncertainty
-└── internal variables
-
-The system initially does not know who it is talking to.
-
-It should be able to discover identity through interaction.
-
----
-
-Phase 3 — Memory
-
-Objective
-
-Allow experiences to persist beyond the current conversation.
-
-Memory types:
-
-Short-Term Memory
-
-Current conversational context.
-
-Episodic Memory
-
-who
-did what
-when
-under what context
-
-Semantic Memory
-
-Knowledge extracted from previous experiences.
-
-Example:
-
-Amir Hossein → user's name
-
-The system should be able to recall previously learned information after many unrelated interactions.
-
----
-
-Phase 4 — Forgetting & Memory Interference
-
-Objective
-
-Study:
-
-- Forgetting
-- Memory replacement
-- Interference
-- Attribution
-- False memories
-
-Example:
-
-A → likes foxes
-B → likes cats
-C → likes dogs
-
-A → likes cats
-
-Then test:
-
-What does A like?
-
-What does B like?
-
-What did A originally like?
-
-Who told you about foxes?
-
----
-
-Phase 5 — Continual Learning
-
-Objective
-
-Experiences should eventually influence the model itself.
-
-Experience
-    ↓
-Memory
-    ↓
-Replay
-    ↓
-Learning
-    ↓
-Model Update
-
-We must measure:
-
-- Behavioral change
-- Knowledge retention
-- Catastrophic forgetting
-- Generalization
-
----
-
-Phase 6 — Replay & Consolidation
-
-Objective
-
-Introduce a distinction between fast experience storage and slow learning.
-
-Experience
-    ↓
-Fast Memory
-    ↓
-Replay
-    ↓
-Consolidation
-    ↓
-Long-Term Knowledge
-
-Possible techniques:
-
-- Replay
-- LoRA
-- Adapters
-- Fast weights
-- Titans-like memory mechanisms
-
-A sleep/offline phase may be introduced:
-
-ACTIVE
-  ↓
-IDLE
-  ↓
-REPLAY
-  ↓
-CONSOLIDATION
-  ↓
-ACTIVE
-
----
-
-Phase 7 — Temporal Awareness
-
-Objective
-
-Allow the system to reason about temporal relationships between experiences.
-
-recent
-old
-before
-after
-previous
-later
-
-The goal is not simply to provide timestamps but to study whether temporal structure can emerge from sequential experience.
-
----
-
-Phase 8 — Uncertainty & Knowledge Gaps
-
-Objective
-
-The system must be able to represent:
-
-known
-partially_known
-unknown
-
-Example:
-
-Titans
-
-architecture → partial
-memory mechanism → uncertain
-implementation details → unknown
-
-The system should not be forced to hallucinate answers when knowledge is missing.
-
----
-
-Phase 9 — Curiosity
-
-Objective
-
-Convert knowledge gaps into information-seeking behavior.
-
-Knowledge Gap
-      ↓
-Uncertainty
-      ↓
-Curiosity
-
-Example:
-
-confidence = 0.25
-curiosity = 0.82
-
-Curiosity here is an engineered information-seeking mechanism, not a claim of subjective experience.
-
----
-
-Phase 10 — Goal Generation
-
-Objective
-
-Allow goals to originate from internal state rather than explicit user requests.
-
-Example:
-
-Knowledge Gap
-      ↓
-Curiosity
-      ↓
-Internal Goal
-
-Instead of:
-
-User:
-Research Titans.
-
-Agent:
-→ Search
-→ Read
-→ Answer
-
-we want:
-
-Brain:
-I don't understand Titans completely.
-
-        ↓
-
-Internal Goal:
-Understand Titans.
-
-        ↓
-
-Action:
-Search.
-
----
-
-Phase 11 — Internal Activity / Idle Brain
-
-Objective
-
-The system should be able to operate while no user input is being received.
-
-User Input
-     │
-     ▼
- Active Brain
-     │
-     ▼
- Idle
-     │
-     ├── Replay
-     ├── Reflection
-     ├── Knowledge Gap Detection
-     ├── Goal Generation
-     └── Action Planning
-
----
-
-Phase 12 — Tool Use
-
-Objective
-
-Allow the Brain to take actions to achieve internally generated goals.
-
-Possible actions:
-
-Think
-Recall
-Search
-Read
-Ask User
-Calculate
-Explore Memory
-Learn
-
-Decision flow:
-
-Internal Goal
-      ↓
-Can memory answer?
-      ↓
-Can reasoning answer?
-      ↓
-Can external information help?
-      ↓
-Select Action
-
----
-
-Phase 13 — Autonomous Search & Exploration
-
-Objective
-
-Demonstrate the first meaningful autonomous behavior.
-
-Goal
- ↓
-Decision
- ↓
-Search
- ↓
-Observation
- ↓
-Learning
- ↓
-Memory Update
-
-Example:
-
-I don't understand distributed cognition.
-
-        ↓
-
-Generate curiosity.
-
-        ↓
-
-Generate goal.
-
-        ↓
-
-Search.
-
-        ↓
-
-Read.
-
-        ↓
-
-Extract information.
-
-        ↓
-
-Store experience.
-
-        ↓
-
-Update knowledge.
-
----
-
-Phase 14 — Self-Directed Learning
-
-Objective
-
-Combine:
-
-- Knowledge gaps
-- Curiosity
-- Goals
-- Actions
-- Observation
-- Memory
-- Learning
-
-into a self-directed learning loop.
-
-Knowledge Gap
-      ↓
-Curiosity
-      ↓
-Internal Goal
-      ↓
-Action Selection
-      ↓
-Action
-      ↓
-Observation
-      ↓
-Learning
-      ↓
-Memory
-      ↓
-Brain State Update
-
----
-
-Phase 15 — Autonomous Cognitive Loop
-
-Objective
-
-Create the first integrated autonomous cognitive loop.
-
-The system should contain:
-
-Persistent State
-+
-Memory
-+
-Learning
-+
-Uncertainty
-+
-Curiosity
-+
-Goals
-+
-Actions
-+
-Internal Activity
-
-The system is no longer merely a reactive chatbot.
-
----
-
-Phase 16 — Long-Term Brain
-
-Objective
-
-Integrate all previous capabilities into a persistent neural architecture.
-
-                    ┌────────────────────┐
-                    │    Brain State    │
-                    └─────────┬──────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              │               │               │
-              ▼               ▼               ▼
-           Memory        Uncertainty       Goals
-              │               │               │
-              └───────────────┼───────────────┘
-                              │
-                              ▼
-                         Brain Process
-                              │
-              ┌───────────────┼───────────────┐
-              │               │               │
-              ▼               ▼               ▼
-            Think          Recall          Act
-                                              │
-                                  ┌───────────┼───────────┐
-                                  ▼           ▼           ▼
-                                Search      Read        Learn
-                                  │           │           │
-                                  └───────────┼───────────┘
-                                              ▼
-                                           Observe
-                                              │
-                                              ▼
-                                            Learn
-                                              │
-                                              ▼
-                                           Memory
-                                              │
-                                              └───────► Brain State
-
----
-
-Final Goal
-
-The ultimate goal of Human Brain is not simply to create a system that answers questions.
-
-The goal is to investigate whether a neural system can develop:
-
-Persistent Identity
-
-A persistent internal identity and state.
-
-Continuous Experience
-
-A continuous stream of experience rather than isolated sessions.
-
-Memory
-
-The ability to store, retrieve, combine, and forget experiences.
-
-Learning
-
-The ability for experiences to change future behavior.
-
-Uncertainty
-
-The ability to recognize what it does not know.
-
-Curiosity
-
-The ability to turn knowledge gaps into information-seeking behavior.
-
-Internal Goals
-
-The ability to generate goals from its own internal state.
-
-Autonomous Activity
-
-The ability to remain active without direct user input.
-
-Tool Interaction
-
-The ability to use external tools to achieve internally generated goals.
-
-Self-Directed Learning
-
-The ability to execute:
-
-I don't know
-      ↓
-I want to know
-      ↓
-I need a goal
-      ↓
-I need an action
-      ↓
-I observe
-      ↓
-I learn
-      ↓
-I update my knowledge
-      ↓
-I discover something else I don't know
-      ↓
-...
-
----
-
-The Ultimate Experiment
-
-Start the system.
-
-Give it no explicit task.
-
-Stop user interaction.
-
-Observe whether the system can independently:
-
-remember
-      ↓
-detect uncertainty
-      ↓
-generate curiosity
-      ↓
-create a goal
-      ↓
-choose an action
-      ↓
-obtain information
-      ↓
-learn
-      ↓
-update memory
-      ↓
-continue
-
-If this behavior can be demonstrated reliably, reproducibly, and quantitatively, the project will have moved significantly beyond the traditional:
-
-Prompt → Response
-
-architecture.
-
----
-
-Scientific Boundary
-
-Observable behavior must not automatically be interpreted as proof of:
-
-- consciousness
-- self-awareness
-- real emotions
-- genuine desires
-- subjective experience
-
-The project focuses on measurable cognitive and behavioral capabilities.
-
----
-
-Core Research Question
-
-«Can a neural system evolve from a reactive input-output model into a continuously active system with persistent state, memory, learning, internally generated goals, and autonomous information-seeking behavior?»
-
----
-
-Development Principle
-
-Every phase follows:
-
-Hypothesis
-    ↓
-Minimal Implementation
-    ↓
-Controlled Experiment
-    ↓
-Measurement
-    ↓
-Analysis
-    ↓
-Iteration
-
-Never:
-
-Build Everything
-    ↓
-It Looks Intelligent
-    ↓
-Assume It Works
-
-Every phase should have:
-
-- A baseline
-- A control experiment
-- Metrics
-- Failure cases
-- Reproducibility
-
----
-
-Roadmap Summary
-
-Phase 0
-Research & Experimental Foundation
-
-Phase 1
-Language & Natural Conversation
-
-Phase 2
-Initial Brain State
-
-Phase 3
-Memory
-
-Phase 4
-Forgetting & Memory Interference
-
-Phase 5
-Continual Learning
-
-Phase 6
-Replay & Consolidation
-
-Phase 7
-Temporal Awareness
-
-Phase 8
-Uncertainty & Knowledge Gaps
-
-Phase 9
-Curiosity
-
-Phase 10
-Goal Generation
-
-Phase 11
-Internal Activity / Idle Brain
-
-Phase 12
-Tool Use
-
-Phase 13
-Autonomous Search & Exploration
-
-Phase 14
-Self-Directed Learning
-
-Phase 15
-Autonomous Cognitive Loop
-
-Phase 16
-Long-Term Brain
-
----
-
-Final Statement
-
-Human Brain is an experimental attempt to explore the transition:
-
-Reactive AI
-    ↓
-Stateful AI
-    ↓
-Learning AI
-    ↓
-Curious AI
-    ↓
-Goal-Directed AI
-    ↓
-Autonomous AI
-
-The project does not assume that this path will lead to consciousness.
-
-It attempts to discover, through engineering and controlled experiments, how far a persistent neural system can progress toward autonomous cognitive behavior.
+</div>

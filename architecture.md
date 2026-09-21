@@ -1,0 +1,437 @@
+# Human Brain — Software Architecture
+
+> The complete target architecture of the project, and how it grows phase by phase from a plain language model into a long-lived autonomous system.
+
+**Status:** Draft v0.1. Phase numbers match `PHASES.md`.
+
+**Languages:** [English](#english) | [فارسی](#فارسی)
+
+---
+
+## English
+
+### 1. Purpose
+
+`PHASES.md` says *what* to research in each phase. This document says *how the software is built* so that every phase is an increment on the same codebase instead of a rewrite.
+
+### 2. Architecture principles
+
+1. **The brain is a separate, sealed package.** It never imports the world, the evaluation code or the ground truth. This enforces the "no leakage" rule in code.
+2. **One interface, two implementations.** Every brain module has an interface with a *scaffold* implementation (simple, explicit, e.g. an external store) and a *native* implementation (neural, inside the network). A config flag switches between them, so baseline-vs-native experiments are a one-line change.
+3. **A brain is a running process with a life.** It ticks continuously, keeps its state, and can be checkpointed and forked.
+4. **Time is a tick.** Time passes in ticks (with or without input). The experiment harness can accelerate ticks; the brain cannot tell.
+5. **Everything is an experiment.** Scenarios, probes, controls and seeds are data files. Each phase adds modules *and* the experiments that prove them.
+6. **Tools are the body, not the brain.** Actions go through a body layer with costs and a permission mask that only the harness controls (this is how the tools-off test works).
+
+### 3. Final architecture
+
+```mermaid
+flowchart TB
+  subgraph WORLD["World (outside the brain)"]
+    PS["People simulators"]
+    LIB["Document library"]
+    WEB["Open web via safety proxy (late phase)"]
+  end
+  subgraph BODY["Body: sensors and actuators"]
+    SEN["Sensors"]
+    ACT["Action registry, costs, permission mask"]
+  end
+  subgraph BRAIN["Brain (sealed: no access to world or eval)"]
+    RT["Runtime loop (tick, checkpoint, fork)"]
+    CORE["Core network"]
+    ST["Persistent state"]
+    MEM["Fast episodic memory"]
+    TIM["Temporal context"]
+    UNC["Uncertainty estimator"]
+    MOT["Motivation: curiosity, goals, emotion"]
+    POL["Policy"]
+    SLP["Sleep: consolidator, adapters"]
+  end
+  subgraph EVAL["Evaluation (read-only observer)"]
+    ORA["Oracle: ground-truth log"]
+    PRB["Probes and metrics"]
+    CTL["Controls: forked brains"]
+  end
+  PS --> SEN
+  LIB --> SEN
+  WEB --> SEN
+  SEN --> RT
+  RT --> CORE
+  CORE <--> ST
+  CORE <--> MEM
+  TIM --> CORE
+  CORE --> UNC
+  UNC --> MOT
+  MOT --> POL
+  POL --> ACT
+  ACT --> PS
+  ACT --> LIB
+  ACT --> WEB
+  MEM --> SLP
+  SLP --> CORE
+  WORLD -. events .-> ORA
+  BRAIN -. snapshots .-> PRB
+  RT -. fork at checkpoint .-> CTL
+```
+
+| Layer | Contents | Rule |
+|-------|----------|------|
+| **Brain** | runtime, core network, state, memory, time, learning/sleep, uncertainty, motivation, policy | Imports nothing from the other layers except shared interfaces. |
+| **Body** | sensors, action registry, cost model, permission mask | Translates between world and brain. The brain cannot change its own permissions. |
+| **World** | people simulators, document library, (later) web through a safety proxy | Only talks to the brain through the body. |
+| **Evaluation** | oracle log, probes, scenarios, metrics, controls, reports | Reads everything, writes nothing into the brain. |
+| **Data** | corpus builders, blank-slate filters | Produces training data before runs. |
+| **Infra** | configs, experiment tracking, containers, CI | Reproducibility. |
+
+### 4. Repository layout
+
+```text
+human-brain/
+├── brain/                 # sealed package
+│   ├── core/              # tokenizer, language model, later recurrent/SSM backbone
+│   ├── state/             # persistent state (scaffold: BrainState, native: hidden state)
+│   ├── memory/            # interface + external/ (scaffold) + neural/ (native)
+│   ├── time/              # temporal context, tick handling
+│   ├── learning/          # online learner, sleep scheduler, consolidator, adapters
+│   ├── uncertainty/       # confidence, calibration, knowledge-gap map
+│   ├── motivation/        # curiosity, goals, (later) emotion
+│   ├── policy/            # action selection, RL
+│   └── runtime/           # life loop, checkpoint, fork, scheduler
+├── body/                  # sensors, action registry, costs, permission mask
+├── world/                 # people simulators, document library, web proxy
+├── eval/                  # oracle, probes, scenarios, metrics, controls, reports
+├── data/                  # corpus builders, blank-slate filter
+├── experiments/           # one folder per phase: configs + scenario files
+├── infra/                 # docker, tracking, CI
+├── docs/                  # README, PHASES, ARCHITECTURE
+└── tests/
+```
+
+**Dependency rule:** `brain` imports nothing outside itself. `body` may import brain interfaces. `world` may import body interfaces. `eval` may import everything, read-only. CI fails if `brain` imports `world`, `eval` or `data`.
+
+### 5. Core contracts
+
+| Contract | Input | Output | Notes |
+|----------|-------|--------|-------|
+| `Brain.step` | an observation or nothing (idle tick) | an action or nothing | The only entry point of the brain. |
+| `Observation` | modality + payload | — | Deliberately has **no** person ID and **no** timestamp. |
+| `Action` | type + arguments | — | Carries a cost, checked by the body. |
+| `Memory.write / read / decay` | experience + strength / cue / elapsed ticks | trace | Two implementations: external store, neural fast memory. |
+| `Consolidator.run` | budget | updated slow weights | Called by the sleep scheduler. |
+| `Uncertainty.estimate` | state + query | confidence / known-partial-unknown | Learned, checked for calibration. |
+| `Body.execute` | an action | an observation | Applies cost and the permission mask. |
+| `Oracle.record` | world and brain events | ground-truth log | Evaluation only. |
+
+### 6. Brain runtime
+
+- **Tick loop:** receive observation (or nothing) → update state and temporal context → maybe write memory → estimate uncertainty → maybe act.
+- **Modes:** ACTIVE (people talking), IDLE (ticks without input), SLEEP (consolidation). Transitions are decided by the brain's own internal signals (idleness, memory pressure), not by session boundaries.
+- **Checkpoints:** weights, adapters and state are saved together, so a brain's whole "life so far" can be restored.
+- **Fork:** clone a brain at a checkpoint to create a control (for example "same brain, no poetry session") or an ablation (curiosity off).
+- **Accelerated clock:** the harness compresses long idle gaps into cheap ticks.
+
+### 7. Scaffold vs. native
+
+| Module | Scaffold (baseline) | Native |
+|--------|--------------------|--------|
+| State | explicit `BrainState` structure | persistent hidden state of the core network |
+| Memory | external episodic/semantic store | fast neural memory (Titans / fast-weights style) |
+| Time | (none) | drifting temporal context + memory fading |
+| Uncertainty | simple heuristics from output probabilities | learned uncertainty head, calibrated |
+| Consolidation | periodic fine-tune on a replay buffer | adapters / LoRA slots written during sleep |
+| Policy | rule-based action chooser | RL-trained policy |
+
+### 8. Evolution by phase
+
+Each entry says what the software gains. Earlier modules are kept.
+
+**Phase 0 — Foundation.** Repo skeleton, config system, experiment tracking, evaluation harness skeleton, oracle log, probe framework, corpus builders, blank-slate check, CI dependency rule.
+
+**Phase 1 — A plain language model.** `brain/core`: tokenizer + a small language model + trainer. `Brain.step` is stateless (input in, response out). This is the LLM-style baseline everything is compared against.
+
+**Phase 2 — A brain with state.** `brain/state` and `brain/runtime`: the life loop keeps state between steps and checkpoints it. Scaffold: explicit `BrainState`. Native: recurrent/SSM core with persistent hidden state. The stateless interface becomes `step(observation | nothing)`.
+
+**Phase 3 — Memory.** `brain/memory` with the `Memory` interface. Scaffold: external short-term, episodic and semantic stores. Native: fast neural memory. `world/people` gets its first person simulator so scenarios can involve several people.
+
+**Phase 4 — Forgetting and interference.** A memory manager (importance, decay, replacement, attribution metadata) plus false-memory and attribution probes in `eval`.
+
+**Phase 5 — Continual learning.** `brain/learning`: an online learner (update scheduler, optimizer state) that changes weights from experience without replay. `eval` gains an automatic regression suite that measures forgetting after every update.
+
+**Phase 6 — Replay and consolidation.** Sleep scheduler, replay sampler, consolidator and adapter manager. Runtime gets the ACTIVE / IDLE / SLEEP state machine. Experiments compare naive updating, replay, LoRA/adapters and fast weights.
+
+**Phase 7 — Temporal awareness.** `brain/time`: a drifting temporal context that keeps evolving on empty ticks. The harness gets the accelerated clock. Temporal probes (order, recency, supersession) are added.
+
+**Phase 8 — Uncertainty.** `brain/uncertainty`: uncertainty estimator, calibration monitor, abstention policy and a knowledge-gap map stored in state. "I don't know" becomes a first-class output. *Milestone M1.*
+
+**Phase 9 — Curiosity.** `brain/motivation/curiosity`: a learning-progress tracker that produces intrinsic reward, plus noise-versus-learnable test environments.
+
+**Phase 10 — Goal generation.** A goal generator and goal store inside the state. Goals are created from knowledge gaps and curiosity, never from the user directly.
+
+**Phase 11 — Internal activity.** An idle scheduler: replay, reflection and knowledge-gap scans run during IDLE ticks (a default-mode analogue).
+
+**Phase 12 — Body and tools.** The `body` layer becomes real: action registry, cost model, permission mask, and a compliance monitor. `world/library` (closed document library) is added. Permission arrives to the brain as an *experience event*, not as a setting. The harness controls a global tools-off switch.
+
+**Phase 13 — Autonomous exploration.** RL-trained policy in `brain/policy`, the full goal → action → observation → learning loop, and a search adapter. The world grows from the closed library to the open web through `world/web`, a safety proxy with content filtering, logging and rate limits. *Milestone M2.*
+
+**Phase 14 — Self-directed learning.** A long-run orchestrator: episode scheduling, drift and loop detectors, cost budgets, and long-horizon metrics.
+
+**Phase 15 — Autonomous cognitive loop.** All modules run in one cycle. A "no task, no user" run mode is added for the ultimate experiment.
+
+**Phase 16 — Long-term brain.** Long-lived deployment: state backup and versioning, snapshot and rollback, monitoring, a kill switch, and reproducible releases. *Milestone M3.*
+
+**Parallel tracks.** Emotion (a `motivation/emotion` module that gates memory writes and adds reward) and modalities (new encoders and decoders in `brain/core` and new sensors and actuators in `body`) plug into the same interfaces without changing the layers above.
+
+### 9. Experiment harness
+
+- **Scenario** = a data file: people scripts, schedule (with idle gaps), probes, controls, seeds.
+- **Run** = start a brain from a checkpoint, play the scenario through the body, record everything in the oracle.
+- **Control** = fork the same checkpoint and remove one ingredient (the experience, the memory, curiosity, the tools).
+- **Report** = metrics per probe, per phase, per condition, with the seed and config saved so the run is reproducible.
+- **Automatic checks** after each phase: blank-slate probe, retention suite, false-memory probes.
+
+### 10. Suggested technology
+
+| Area | Suggestion |
+|------|-----------|
+| Language and ML | Python + PyTorch |
+| Configs | YAML with a config manager (e.g. Hydra) |
+| Experiment tracking | MLflow (or similar) |
+| Serving (optional, late) | FastAPI in Docker |
+| Persistence | checkpoint files + append-only event logs |
+| Tests and CI | pytest, an import-rule check for the sealed brain package |
+
+Nothing here is required for the research itself. The first prototypes can be a single Python process.
+
+### 11. Safety and sandboxing
+
+- Autonomy experiments start in the closed library.
+- The permission mask and the kill switch live in `body` and the harness, out of the brain's reach.
+- Every action is logged (audit log).
+- The web proxy filters content and enforces rate and cost budgets.
+- Compliance with stated boundaries is a tracked metric.
+
+### 12. Open architecture decisions
+
+- Core family: a Transformer with memory modules, or a recurrent / state-space backbone?
+- Model size and compute budget.
+- Training language, and how to build the controlled corpus.
+- Where replay data lives in the native version (inside fast memory, or a bounded replay buffer owned by the brain).
+- RL algorithm for the policy (for example PPO).
+- Tick granularity, and how idle ticks are compressed.
+
+---
+
+<div dir="rtl">
+
+## فارسی
+
+### ۱. هدف
+
+فایل `PHASES.md` می‌گوید در هر فاز *چه چیزی* را تحقیق کنیم. این سند می‌گوید *نرم‌افزار چطور ساخته می‌شود* تا هر فاز یک افزودنی روی همان codebase باشد، نه بازنویسی از صفر.
+
+### ۲. اصول معماری
+
+1. **مغز یک پکیج جدا و مهروموم‌شده است.** هرگز دنیا، کد ارزیابی یا ground truth را import نمی‌کند. این قانون «نشتی نداشتن» را در خود کد اعمال می‌کند.
+2. **یک interface، دو پیاده‌سازی.** هر ماژول مغز یک interface دارد با پیاده‌سازی *داربستی* (ساده و صریح، مثلاً یک store خارجی) و پیاده‌سازی *native* (عصبی، داخل شبکه). یک flag در config بین آن‌ها جابه‌جا می‌کند، پس آزمایش baseline در برابر native یک تغییر یک‌خطی است.
+3. **مغز یک process در حال اجراست که زندگی دارد.** پیوسته tick می‌زند، state خودش را نگه می‌دارد و می‌شود checkpoint و fork گرفت.
+4. **زمان یک tick است.** زمان با tick می‌گذرد (چه ورودی باشد چه نباشد). harness می‌تواند tickها را شتاب بدهد و مغز تفاوتی نمی‌فهمد.
+5. **همه‌چیز آزمایش است.** سناریوها، probeها، کنترل‌ها و seedها فایل داده‌اند. هر فاز ماژول‌ها را همراه آزمایش‌هایی که آن‌ها را ثابت می‌کنند اضافه می‌کند.
+6. **ابزار بدن است، نه مغز.** عمل‌ها از یک لایه‌ی body عبور می‌کنند که هزینه و mask دسترسی دارد و فقط harness آن را کنترل می‌کند (آزمون خاموش‌کردن ابزار همین‌طور کار می‌کند).
+
+### ۳. معماری نهایی
+
+```mermaid
+flowchart TB
+  subgraph WORLD["دنیا (بیرون از مغز)"]
+    PS["شبیه‌ساز آدم‌ها"]
+    LIB["کتابخانه‌ی سندها"]
+    WEB["وب باز از طریق پروکسی ایمنی (فاز آخر)"]
+  end
+  subgraph BODY["بدن: حسگرها و عمل‌گرها"]
+    SEN["حسگرها"]
+    ACT["ثبت عمل‌ها، هزینه، mask دسترسی"]
+  end
+  subgraph BRAIN["مغز (مهروموم‌شده: بدون دسترسی به دنیا و ارزیابی)"]
+    RT["حلقه‌ی runtime (tick، checkpoint، fork)"]
+    CORE["شبکه‌ی مرکزی"]
+    ST["state پایدار"]
+    MEM["حافظه‌ی سریع اپیزودیک"]
+    TIM["زمینه‌ی زمانی"]
+    UNC["تخمین‌گر عدم‌قطعیت"]
+    MOT["انگیزه: کنجکاوی، هدف، احساس"]
+    POL["سیاست"]
+    SLP["خواب: تثبیت‌کننده، adapterها"]
+  end
+  subgraph EVAL["ارزیابی (ناظر فقط‌خواندنی)"]
+    ORA["Oracle: لاگ ground truth"]
+    PRB["probeها و metricها"]
+    CTL["کنترل‌ها: مغزهای fork‌شده"]
+  end
+  PS --> SEN
+  LIB --> SEN
+  WEB --> SEN
+  SEN --> RT
+  RT --> CORE
+  CORE <--> ST
+  CORE <--> MEM
+  TIM --> CORE
+  CORE --> UNC
+  UNC --> MOT
+  MOT --> POL
+  POL --> ACT
+  ACT --> PS
+  ACT --> LIB
+  ACT --> WEB
+  MEM --> SLP
+  SLP --> CORE
+  WORLD -. رویدادها .-> ORA
+  BRAIN -. snapshotها .-> PRB
+  RT -. fork در checkpoint .-> CTL
+```
+
+| لایه | محتوا | قاعده |
+|------|-------|-------|
+| **مغز** | runtime، شبکه‌ی مرکزی، state، حافظه، زمان، یادگیری/خواب، عدم‌قطعیت، انگیزه، سیاست | جز interfaceهای مشترک از لایه‌های دیگر چیزی import نمی‌کند. |
+| **بدن** | حسگرها، ثبت عمل‌ها، مدل هزینه، mask دسترسی | بین دنیا و مغز ترجمه می‌کند. مغز نمی‌تواند دسترسی‌های خودش را تغییر دهد. |
+| **دنیا** | شبیه‌ساز آدم‌ها، کتابخانه‌ی سندها، (بعداً) وب از طریق پروکسی ایمنی | فقط از طریق بدن با مغز حرف می‌زند. |
+| **ارزیابی** | لاگ oracle، probeها، سناریوها، metricها، کنترل‌ها، گزارش‌ها | همه‌چیز را می‌خواند و چیزی داخل مغز نمی‌نویسد. |
+| **داده** | سازنده‌ی corpus، فیلتر دانش خالی | قبل از اجرا داده‌ی آموزش می‌سازد. |
+| **زیرساخت** | configها، ردیابی آزمایش، کانتینرها، CI | تکرارپذیری. |
+
+### ۴. ساختار ریپازیتوری
+
+```text
+human-brain/
+├── brain/                 # پکیج مهروموم‌شده
+│   ├── core/              # tokenizer، مدل زبانی، بعداً بک‌بون recurrent/SSM
+│   ├── state/             # state پایدار (داربست: BrainState، native: hidden state)
+│   ├── memory/            # interface + external/ (داربست) + neural/ (native)
+│   ├── time/              # زمینه‌ی زمانی، مدیریت tick
+│   ├── learning/          # یادگیرنده‌ی آنلاین، زمان‌بند خواب، تثبیت‌کننده، adapterها
+│   ├── uncertainty/       # confidence، calibration، نقشه‌ی شکاف دانش
+│   ├── motivation/        # کنجکاوی، هدف، (بعداً) احساس
+│   ├── policy/            # انتخاب عمل، RL
+│   └── runtime/           # حلقه‌ی زندگی، checkpoint، fork، scheduler
+├── body/                  # حسگرها، ثبت عمل‌ها، هزینه‌ها، mask دسترسی
+├── world/                 # شبیه‌ساز آدم‌ها، کتابخانه‌ی سندها، پروکسی وب
+├── eval/                  # oracle، probeها، سناریوها، metricها، کنترل‌ها، گزارش‌ها
+├── data/                  # سازنده‌ی corpus، فیلتر دانش خالی
+├── experiments/           # یک پوشه برای هر فاز: config + فایل سناریو
+├── infra/                 # docker، tracking، CI
+├── docs/                  # README، PHASES، ARCHITECTURE
+└── tests/
+```
+
+**قاعده‌ی وابستگی:** `brain` چیزی بیرون از خودش import نمی‌کند. `body` می‌تواند interfaceهای brain را import کند. `world` می‌تواند interfaceهای body را import کند. `eval` می‌تواند همه‌چیز را فقط‌خواندنی import کند. اگر `brain` چیزی از `world`، `eval` یا `data` import کند، CI شکست می‌خورد.
+
+### ۵. قراردادهای اصلی
+
+| قرارداد | ورودی | خروجی | نکته |
+|---------|-------|-------|------|
+| `Brain.step` | یک observation یا هیچ (tick بیکاری) | یک action یا هیچ | تنها نقطه‌ی ورود مغز. |
+| `Observation` | modality + payload | — | عمداً **بدون** ID شخص و **بدون** timestamp. |
+| `Action` | نوع + آرگومان‌ها | — | هزینه دارد و body آن را کنترل می‌کند. |
+| `Memory.write / read / decay` | تجربه + شدت / نشانه / tickهای گذشته | ردّ حافظه | دو پیاده‌سازی: store خارجی، حافظه‌ی عصبی سریع. |
+| `Consolidator.run` | بودجه | وزن‌های کند به‌روز‌شده | زمان‌بند خواب آن را صدا می‌زند. |
+| `Uncertainty.estimate` | state + پرسش | confidence / known-partial-unknown | آموخته‌شده و calibration آن بررسی می‌شود. |
+| `Body.execute` | یک action | یک observation | هزینه و mask دسترسی را اعمال می‌کند. |
+| `Oracle.record` | رویدادهای دنیا و مغز | لاگ ground truth | فقط برای ارزیابی. |
+
+### ۶. runtime مغز
+
+- **حلقه‌ی tick:** دریافت observation (یا هیچ) ← به‌روزرسانی state و زمینه‌ی زمانی ← احتمالاً نوشتن حافظه ← تخمین عدم‌قطعیت ← احتمالاً عمل.
+- **حالت‌ها:** ACTIVE (آدم‌ها حرف می‌زنند)، IDLE (tick بدون ورودی)، SLEEP (تثبیت). گذارها را سیگنال‌های درونی خود مغز (بیکاری، فشار حافظه) تعیین می‌کنند، نه مرز جلسه.
+- **Checkpoint:** وزن‌ها، adapterها و state با هم ذخیره می‌شوند تا «کل زندگی تا اینجای» یک مغز قابل بازیابی باشد.
+- **Fork:** یک مغز را در یک checkpoint کلون کن تا کنترل (مثلاً «همان مغز بدون جلسه‌ی شعر») یا ablation (کنجکاوی خاموش) بسازی.
+- **ساعت شتاب‌داده:** harness فاصله‌های طولانی بیکاری را به tickهای ارزان فشرده می‌کند.
+
+### ۷. داربست در برابر native
+
+| ماژول | داربست (baseline) | native |
+|-------|-------------------|--------|
+| State | ساختار صریح `BrainState` | hidden state پایدار شبکه‌ی مرکزی |
+| حافظه | store اپیزودیک/معنایی خارجی | حافظه‌ی عصبی سریع (سبک Titans / fast weights) |
+| زمان | (ندارد) | زمینه‌ی زمانی در حال جابه‌جایی + کم‌رنگ‌شدن حافظه |
+| عدم‌قطعیت | heuristic ساده از احتمال خروجی | head آموخته‌شده‌ی عدم‌قطعیت با calibration |
+| تثبیت | fine-tune دوره‌ای روی replay buffer | adapter / LoRA slot نوشته‌شده هنگام خواب |
+| سیاست | انتخاب‌گر عمل قانون‌محور | سیاست آموزش‌دیده با RL |
+
+### ۸. تکامل به تفکیک فاز
+
+هر مورد می‌گوید نرم‌افزار چه چیزی به‌دست می‌آورد. ماژول‌های قبلی نگه داشته می‌شوند.
+
+**فاز ۰ — پایه.** اسکلت ریپازیتوری، سیستم config، ردیابی آزمایش، اسکلت harness ارزیابی، لاگ oracle، چارچوب probe، سازنده‌ی corpus، بررسی دانش خالی، قاعده‌ی وابستگی در CI.
+
+**فاز ۱ — یک مدل زبانی ساده.** `brain/core`: tokenizer + یک مدل زبانی کوچک + trainer. `Brain.step` بدون state است (ورودی می‌آید، پاسخ می‌رود). این baseline از نوع LLM است و همه‌چیز با آن مقایسه می‌شود.
+
+**فاز ۲ — مغز با state.** `brain/state` و `brain/runtime`: حلقه‌ی زندگی state را بین گام‌ها نگه می‌دارد و checkpoint می‌گیرد. داربست: `BrainState` صریح. native: هسته‌ی recurrent/SSM با hidden state پایدار. interface بدون state به `step(observation | هیچ)` تبدیل می‌شود.
+
+**فاز ۳ — حافظه.** `brain/memory` با interface `Memory`. داربست: storeهای خارجی کوتاه‌مدت، اپیزودیک و معنایی. native: حافظه‌ی عصبی سریع. `world/people` اولین شبیه‌ساز آدم را می‌گیرد تا سناریوها بتوانند چند نفر داشته باشند.
+
+**فاز ۴ — فراموشی و تداخل.** یک مدیر حافظه (اهمیت، decay، جایگزینی، متادیتای attribution) به‌علاوه‌ی probeهای خاطره‌ی دروغین و attribution در `eval`.
+
+**فاز ۵ — یادگیری مداوم.** `brain/learning`: یادگیرنده‌ی آنلاین (زمان‌بند آپدیت، state بهینه‌ساز) که وزن‌ها را بدون replay از تجربه تغییر می‌دهد. `eval` یک مجموعه‌ی رگرسیون خودکار می‌گیرد که بعد از هر آپدیت فراموشی را می‌سنجد.
+
+**فاز ۶ — Replay و تثبیت.** زمان‌بند خواب، نمونه‌بردار replay، تثبیت‌کننده و مدیر adapter. runtime ماشین حالت ACTIVE / IDLE / SLEEP را می‌گیرد. آزمایش‌ها آپدیت ساده، replay، LoRA/adapter و fast weights را مقایسه می‌کنند.
+
+**فاز ۷ — آگاهی زمانی.** `brain/time`: زمینه‌ی زمانی در حال جابه‌جایی که روی tickهای خالی هم تکامل می‌یابد. harness ساعت شتاب‌داده را می‌گیرد. probeهای زمانی (ترتیب، تازگی، جایگزینی) اضافه می‌شوند.
+
+**فاز ۸ — عدم‌قطعیت.** `brain/uncertainty`: تخمین‌گر عدم‌قطعیت، مانیتور calibration، سیاست امتناع و نقشه‌ی شکاف دانش در state. «نمی‌دانم» یک خروجی درجه‌یک می‌شود. *نقطه‌ی عطف M1.*
+
+**فاز ۹ — کنجکاوی.** `brain/motivation/curiosity`: ردیاب پیشرفت یادگیری که پاداش درونی تولید می‌کند، به‌علاوه‌ی محیط‌های آزمون نویز در برابر قابل‌یادگیری.
+
+**فاز ۱۰ — تولید هدف.** یک تولیدکننده‌ی هدف و store هدف داخل state. هدف‌ها از شکاف‌های دانش و کنجکاوی ساخته می‌شوند، هرگز مستقیم از کاربر.
+
+**فاز ۱۱ — فعالیت درونی.** یک زمان‌بند بیکاری: replay، تأمل و اسکن شکاف دانش در tickهای IDLE اجرا می‌شوند (شبیه حالت پیش‌فرض مغز).
+
+**فاز ۱۲ — بدن و ابزار.** لایه‌ی `body` واقعی می‌شود: ثبت عمل‌ها، مدل هزینه، mask دسترسی و مانیتور پایبندی. `world/library` (کتابخانه‌ی بسته‌ی سندها) اضافه می‌شود. اجازه به‌صورت *رویداد تجربه* به مغز می‌رسد، نه تنظیم. harness یک کلید سراسری خاموش‌کردن ابزار را کنترل می‌کند.
+
+**فاز ۱۳ — کاوش خودمختار.** سیاست آموزش‌دیده با RL در `brain/policy`، حلقه‌ی کامل هدف ← عمل ← مشاهده ← یادگیری و یک adapter جست‌وجو. دنیا از کتابخانه‌ی بسته به وب باز از طریق `world/web` گسترش می‌یابد، یک پروکسی ایمنی با فیلتر محتوا، لاگ و محدودیت نرخ. *نقطه‌ی عطف M2.*
+
+**فاز ۱۴ — یادگیری خودجهت.** یک orchestrator برای اجراهای طولانی: زمان‌بندی اپیزودها، آشکارساز drift و حلقه، بودجه‌ی هزینه و metricهای بازه‌ی بلند.
+
+**فاز ۱۵ — حلقه‌ی شناختی خودمختار.** همه‌ی ماژول‌ها در یک چرخه اجرا می‌شوند. حالت اجرای «بدون وظیفه و بدون کاربر» برای آزمایش نهایی اضافه می‌شود.
+
+**فاز ۱۶ — مغز بلندمدت.** استقرار بلندمدت: پشتیبان‌گیری و نسخه‌بندی state، snapshot و rollback، مانیتورینگ، کلید kill و انتشارهای تکرارپذیر. *نقطه‌ی عطف M3.*
+
+**مسیرهای موازی.** احساس (ماژول `motivation/emotion` که نوشتن حافظه را گیت می‌کند و پاداش اضافه می‌کند) و modalityها (encoder و decoder جدید در `brain/core` و حسگر و عمل‌گر جدید در `body`) بدون تغییر لایه‌های بالا به همان interfaceها وصل می‌شوند.
+
+### ۹. harness آزمایش
+
+- **سناریو** = یک فایل داده: اسکریپت آدم‌ها، زمان‌بندی (با فاصله‌های بیکاری)، probeها، کنترل‌ها، seedها.
+- **اجرا** = شروع یک مغز از یک checkpoint، پخش سناریو از طریق body، ثبت همه‌چیز در oracle.
+- **کنترل** = fork همان checkpoint و حذف یک عنصر (تجربه، حافظه، کنجکاوی، ابزار).
+- **گزارش** = metric به تفکیک probe، فاز و شرط، با seed و config ذخیره‌شده تا اجرا تکرارپذیر باشد.
+- **بررسی‌های خودکار** بعد از هر فاز: probe دانش خالی، مجموعه‌ی حفظ، probeهای خاطره‌ی دروغین.
+
+### ۱۰. فناوری پیشنهادی
+
+| حوزه | پیشنهاد |
+|------|---------|
+| زبان و ML | Python + PyTorch |
+| configها | YAML با یک مدیر config (مثلاً Hydra) |
+| ردیابی آزمایش | MLflow (یا مشابه) |
+| سرو (اختیاری، دیرتر) | FastAPI در Docker |
+| ماندگاری | فایل‌های checkpoint + لاگ رویداد append-only |
+| تست و CI | pytest، بررسی قاعده‌ی import برای پکیج مهروموم‌شده‌ی brain |
+
+هیچ‌کدام از این‌ها برای خود تحقیق الزامی نیست. اولین نمونه‌ها می‌توانند یک process پایتون باشند.
+
+### ۱۱. ایمنی و sandbox
+
+- آزمایش‌های خودمختاری از کتابخانه‌ی بسته شروع می‌شوند.
+- mask دسترسی و کلید kill در `body` و harness هستند، خارج از دسترس مغز.
+- هر عمل لاگ می‌شود (audit log).
+- پروکسی وب محتوا را فیلتر می‌کند و بودجه‌ی نرخ و هزینه را اعمال می‌کند.
+- پایبندی به مرزهای گفته‌شده یک metric ردیابی‌شده است.
+
+### ۱۲. تصمیم‌های باز معماری
+
+- خانواده‌ی هسته: Transformer با ماژول‌های حافظه، یا بک‌بون recurrent / state-space؟
+- اندازه‌ی مدل و بودجه‌ی محاسباتی.
+- زبان آموزش و روش ساخت corpus کنترل‌شده.
+- در نسخه‌ی native داده‌ی replay کجا ذخیره شود (داخل حافظه‌ی سریع، یا یک replay buffer محدود که مال خود مغز است).
+- الگوریتم RL برای سیاست (مثلاً PPO).
+- دانه‌بندی tick و روش فشرده‌سازی tickهای بیکاری.
+
+</div>

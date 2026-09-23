@@ -1,0 +1,39 @@
+{
+  "dataset": "taesiri/TinyStories-Farsi",
+  "source": "Hugging Face",
+  "text_column": "Persian",
+  "normalization": [
+    "Unicode NFC",
+    "Arabic Yeh -> Persian Yeh",
+    "Arabic Kaf -> Persian Kaf",
+    "line ending normalization",
+    "whitespace normalization",
+    "empty line removal",
+    "short document filtering",
+    "duplicate filtering"
+  ],
+  "shard_size_mb": 25,
+  "min_chars": 20,
+  "splits": {
+    "train": {
+      "split": "train",
+      "documents": 124264,
+      "characters": 94802620,
+      "shards": 4,
+      "duplicates": 52,
+      "skipped_empty": 0,
+      "skipped_short": 16,
+      "skipped_invalid": 79
+    },
+    "validation": {
+      "split": "validation",
+      "documents": 27604,
+      "characters": 20963320,
+      "shards": 1,
+      "duplicates": 6,
+      "skipped_empty": 0,
+      "skipped_short": 4,
+      "skipped_invalid": 16
+    }
+  }
+}

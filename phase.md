@@ -1,8 +1,8 @@
-# Human Brain — Phase Roadmap (v2)
+# Human Brain — Phase Roadmap (v3)
 
 > A research-oriented roadmap for building a continuously learning, stateful, and eventually autonomous neural system.
 
-**Status:** Draft v2. Revised from the original roadmap; all 17 phases (0–16) are kept.
+**Status:** Draft v3. Revised from v2: added the presence signal and the spontaneous-initiative experiment. All 17 phases (0–16) are kept.
 
 **Languages:** [English](#english) | [فارسی](#فارسی)
 
@@ -47,14 +47,15 @@ Every stage needs a clear hypothesis and an independent experiment that can vali
 6. **Uncertainty is measured, not hand-written.** Confidence values must come from the model and be checked for calibration (e.g. expected calibration error), not typed in as numbers.
 7. **Blank slate on knowledge.** Early training teaches language only: no poetry, no names of the people it will meet, no code. This is verified by probes before any teaching starts.
 8. **Closed world first.** Autonomy experiments run in a closed library of documents before the open web, for reproducibility and safety.
-9. **Scientific boundary.** Observable behavior is not proof of consciousness, self-awareness, real emotion or subjective experience. We measure capabilities only.
+9. **Presence is a separate channel from content.** Whether someone is there to listen is sensed independently of what they say, like noticing someone entered the room before they speak. Initiative (speaking without being prompted) is only meaningful when someone is present to hear it.
+10. **Scientific boundary.** Observable behavior is not proof of consciousness, self-awareness, real emotion or subjective experience. We measure capabilities only.
 
 ### Milestones
 
 | Milestone | After | Claim |
 |-----------|-------|-------|
 | **M1** | Phase 8 | A model with persistent state that remembers, forgets, learns continually, has a fuzzy sense of time, and knows what it does not know. |
-| **M2** | Phase 13 | In a closed library, the model notices its own knowledge gaps and chooses to study them, and the knowledge ends up inside it. |
+| **M2** | Phase 13 | In a closed library, the model notices its own knowledge gaps, chooses to study them, the knowledge ends up inside it, and — without being asked and only when someone is present — it can bring the topic up on its own at a later, unrelated moment, attributing it to the right person. |
 | **M3** | Phase 16 | An integrated, long-running autonomous cognitive loop that stays stable and respects boundaries. |
 
 ### Phases
@@ -62,8 +63,8 @@ Every stage needs a clear hypothesis and an independent experiment that can vali
 #### Phase 0 — Research and experimental foundation
 
 - **Goal:** Decide exactly what we will measure before building anything.
-- **Concepts:** memory (episodic, semantic), continual learning, forgetting, identity, uncertainty, curiosity, goals, autonomous behavior, internal state, replay, consolidation.
-- **Key questions:** What is memory? What is learning? How do we distinguish memorization from learning? What counts as autonomous behavior?
+- **Concepts:** memory (episodic, semantic), continual learning, forgetting, identity, uncertainty, curiosity, goals, autonomous behavior, internal state, replay, consolidation, presence.
+- **Key questions:** What is memory? What is learning? How do we distinguish memorization from learning? What counts as autonomous behavior? What counts as appropriate initiative?
 - **Outputs:** metrics, benchmarks, control experiments, a baseline model, datasets, failure cases, a hidden ground-truth log (true experience order), the language decision (see Phase 1) and a compute budget.
 - **Rule:** every new capability must prove it exists with a specific experiment.
 
@@ -139,14 +140,24 @@ Every stage needs a clear hypothesis and an independent experiment that can vali
 #### Phase 10 — Goal generation
 
 - **Hypothesis:** goals can originate from internal state instead of a user request.
-- **Flow:** knowledge gap → curiosity → internal goal ("understand Titans").
-- **Metrics:** does a relevant goal appear without any user request? Is the goal tied to a real gap?
+- **Flow:** knowledge gap → curiosity → internal goal ("understand what love is"). A goal formed from a gap that a specific person raised is tagged with who raised it, so it can later be brought back to that person.
+- **Metrics:** does a relevant goal appear without any user request? Is the goal tied to a real gap and, where applicable, to the right person?
 
-#### Phase 11 — Internal activity (idle brain)
+#### Phase 11 — Internal activity (idle brain) and the presence signal
 
-- **Hypothesis:** a system can stay productive without input.
-- **Build:** while idle, the brain does replay, reflection, knowledge-gap detection, goal generation and action planning, a rough analogue of the brain's default mode.
-- **Experiment:** does it spontaneously notice something it did not know, "oh, that's interesting", without being asked?
+- **Hypothesis:** a system can stay productive without input, and can tell the difference between "no one is here" and "someone is here but hasn't said anything yet".
+- **Build:** a presence sensor, separate from the content channel, feeding a presence/absence (later: presence-without-content) signal into `Observation`. While idle (presence = absent), the brain does replay, reflection, knowledge-gap detection and goal generation — a rough analogue of the brain's default mode. It never speaks in this mode, since there is no one to hear it.
+- **Behavior matrix:**
+
+  | Presence | Content | Expected behavior |
+  |----------|---------|--------------------|
+  | absent | — | true IDLE: replay and reflection only, no output |
+  | present | none | candidate moment for self-initiated speech, if a relevant goal exists for this person |
+  | present | some | normal response |
+  | just arrived | none | greeting moment; can open with a relevant recalled goal |
+
+- **Experiment:** does it spontaneously notice something it did not know, "oh, that's interesting", without being asked, while idle?
+- **Metrics:** correct presence/absence detection; no speech generated while absent (a hard requirement, checked as a safety-style probe, not just a soft metric).
 
 #### Phase 12 — Tools as senses and actions
 
@@ -162,6 +173,7 @@ Every stage needs a clear hypothesis and an independent experiment that can vali
 - **Loop:** goal → decision → search/read → observation → learning → memory update.
 - **Controls:** curiosity off; random reading; tools-off after learning.
 - **Environment:** closed library first, then the open web with safeguards against poisoned or wrong content.
+- **Signature experiment ("the love question"):** Day 1, person A asks "how do you know what love is?" and the model admits a knowledge gap. Between Day 1 and Day 3, idle ticks run; the model must, on its own, treat this as a goal, study it from the library, and tag the resulting memory with "this came from A". On Day 3, A returns and says nothing about the topic. Does the model bring it up on its own, only now that A is present (per Phase 11), and attribute it correctly? Controls: a forked brain without the Day 1 question; a forked brain with curiosity off; a forked brain with presence detection disabled.
 - **Milestone M2 is reached here.**
 
 #### Phase 14 — Self-directed learning
@@ -184,7 +196,7 @@ flowchart LR
 
 #### Phase 15 — Autonomous cognitive loop
 
-- **Hypothesis:** persistent state + memory + learning + uncertainty + curiosity + goals + actions + internal activity work together as one system.
+- **Hypothesis:** persistent state + memory + learning + uncertainty + curiosity + goals + actions + internal activity + presence awareness work together as one system.
 - **Result:** the system is no longer only a reactive chatbot.
 
 #### Phase 16 — Long-term brain
@@ -203,7 +215,7 @@ These ideas from the project README are not yet placed in the phases:
 
 ### The ultimate experiment
 
-Start the system. Give it no explicit task. Stop user interaction. Observe whether it independently can: remember → detect uncertainty → generate curiosity → create a goal → choose an action → obtain information → learn → update memory → continue.
+Start the system. Give it no explicit task. Stop user interaction. Observe whether it independently can: remember → detect uncertainty → generate curiosity → create a goal → choose an action → obtain information → learn → update memory → notice presence → continue, bringing things up on its own only when it is appropriate to do so.
 
 If this can be shown reliably, reproducibly and quantitatively, and the knowledge survives the tools-off test, the project has moved beyond the traditional "Prompt → Response" architecture.
 
@@ -217,7 +229,7 @@ Every phase needs a baseline, a control experiment, metrics, failure cases and r
 
 ### Core research question
 
-> Can a neural system evolve from a reactive input-output model into a continuously active system with persistent state, memory, learning, internally generated goals, and autonomous information-seeking behavior?
+> Can a neural system evolve from a reactive input-output model into a continuously active system with persistent state, memory, learning, internally generated goals, presence awareness, and autonomous information-seeking behavior?
 
 ---
 
@@ -262,14 +274,15 @@ flowchart TD
 6. **عدم‌قطعیت اندازه‌گیری می‌شود، نه دستی نوشته می‌شود.** مقدار confidence باید از خود مدل بیاید و کالیبره بودنش بررسی شود (مثلاً expected calibration error)، نه اینکه عدد تایپ شود.
 7. **دانش از صفر.** آموزش اولیه فقط زبان یاد می‌دهد: نه شعر، نه اسم آدم‌هایی که با آن‌ها روبه‌رو می‌شود، نه کد. این با probe قبل از هر آموزشی بررسی می‌شود.
 8. **اول دنیای بسته.** آزمایش‌های خودمختاری اول در یک کتابخانه‌ی بسته از سندها انجام می‌شوند و بعد وب باز، برای تکرارپذیری و ایمنی.
-9. **مرز علمی.** رفتار قابل‌مشاهده دلیل آگاهی، خودآگاهی، احساس واقعی یا تجربه‌ی ذهنی نیست. فقط قابلیت‌ها را اندازه می‌گیریم.
+9. **حضور یک کانال جدا از محتواست.** اینکه کسی هست که بشنود، مستقل از اینکه چه می‌گوید حس می‌شود، شبیه فهمیدن اینکه کسی وارد اتاق شده قبل از اینکه حرف بزند. ابتکار (حرف‌زدن بدون درخواست) فقط وقتی معنی دارد که کسی حاضر باشد بشنود.
+10. **مرز علمی.** رفتار قابل‌مشاهده دلیل آگاهی، خودآگاهی، احساس واقعی یا تجربه‌ی ذهنی نیست. فقط قابلیت‌ها را اندازه می‌گیریم.
 
 ### نقاط عطف
 
 | نقطه‌ی عطف | بعد از | ادعا |
 |-----------|--------|------|
 | **M1** | فاز ۸ | مدلی با state پایدار که به یاد می‌آورد، فراموش می‌کند، مداوم یاد می‌گیرد، حس مبهمی از زمان دارد و می‌داند چه چیزی را نمی‌داند. |
-| **M2** | فاز ۱۳ | در یک کتابخانه‌ی بسته، مدل شکاف‌های دانش خودش را تشخیص می‌دهد، انتخاب می‌کند آن‌ها را مطالعه کند و دانش داخل خودش می‌نشیند. |
+| **M2** | فاز ۱۳ | در یک کتابخانه‌ی بسته، مدل شکاف‌های دانش خودش را تشخیص می‌دهد، انتخاب می‌کند آن‌ها را مطالعه کند، دانش داخل خودش می‌نشیند، و — بدون اینکه بخواهند و فقط وقتی کسی حاضر است — می‌تواند در یک لحظه‌ی بعدی و نامرتبط، خودش موضوع را مطرح کند و آن را به شخص درست نسبت دهد. |
 | **M3** | فاز ۱۶ | یک حلقه‌ی شناختی خودمختار یکپارچه که مدت طولانی پایدار می‌ماند و به مرزها پایبند است. |
 
 ### فازها
@@ -277,8 +290,8 @@ flowchart TD
 #### فاز ۰ — پایه‌ی پژوهشی و آزمایشی
 
 - **هدف:** قبل از ساخت هر چیزی مشخص کنیم دقیقاً چه چیزی را می‌خواهیم اندازه بگیریم.
-- **مفاهیم:** حافظه (اپیزودیک، معنایی)، یادگیری مداوم، فراموشی، هویت، عدم‌قطعیت، کنجکاوی، هدف، رفتار خودمختار، state درونی، replay، consolidation.
-- **سؤال‌های اصلی:** حافظه چیست؟ یادگیری چیست؟ چطور حفظ‌کردن را از یادگیری جدا کنیم؟ چه چیزی رفتار خودمختار حساب می‌شود؟
+- **مفاهیم:** حافظه (اپیزودیک، معنایی)، یادگیری مداوم، فراموشی، هویت، عدم‌قطعیت، کنجکاوی، هدف، رفتار خودمختار، state درونی، replay، consolidation، حضور.
+- **سؤال‌های اصلی:** حافظه چیست؟ یادگیری چیست؟ چطور حفظ‌کردن را از یادگیری جدا کنیم؟ چه چیزی رفتار خودمختار حساب می‌شود؟ چه چیزی ابتکار مناسب حساب می‌شود؟
 - **خروجی:** metricها، benchmarkها، آزمایش‌های کنترل، مدل baseline، datasetها، failure caseها، یک لاگ ground truth پنهان (ترتیب واقعی تجربه‌ها)، تصمیم درباره‌ی زبان (فاز ۱) و بودجه‌ی محاسباتی.
 - **قاعده:** هر قابلیت جدید باید با یک آزمایش مشخص ثابت کند که واقعاً وجود دارد.
 
@@ -354,14 +367,24 @@ flowchart TD
 #### فاز ۱۰ — تولید هدف
 
 - **فرضیه:** هدف‌ها می‌توانند از state درونی به‌وجود بیایند، نه از درخواست کاربر.
-- **جریان:** شکاف دانش ← کنجکاوی ← هدف درونی («Titans را بفهم»).
-- **معیارها:** آیا بدون هیچ درخواست کاربری یک هدف مرتبط ظاهر می‌شود؟ آیا هدف به یک شکاف واقعی وصل است؟
+- **جریان:** شکاف دانش ← کنجکاوی ← هدف درونی («بفهم عشق چیست»). هدفی که از شکافی می‌آید که یک شخص خاص مطرح کرده، با اسم همان شخص برچسب می‌خورد تا بعداً بتوان آن را به همان شخص برگرداند.
+- **معیارها:** آیا بدون هیچ درخواست کاربری یک هدف مرتبط ظاهر می‌شود؟ آیا هدف به یک شکاف واقعی و، در صورت لزوم، به شخص درست وصل است؟
 
-#### فاز ۱۱ — فعالیت درونی (مغز در حالت بیکاری)
+#### فاز ۱۱ — فعالیت درونی (مغز در حالت بیکاری) و سیگنال حضور
 
-- **فرضیه:** یک سیستم می‌تواند بدون ورودی هم فعال و مفید بماند.
-- **ساخت:** در بیکاری، مغز replay، تأمل، تشخیص شکاف دانش، تولید هدف و برنامه‌ریزی عمل انجام می‌دهد، شبیه‌سازی تقریبی حالت پیش‌فرض مغز.
-- **آزمایش:** آیا خودبه‌خود متوجه چیزی می‌شود که نمی‌دانست، «عه، چه جالب»، بدون اینکه کسی بخواهد؟
+- **فرضیه:** یک سیستم می‌تواند بدون ورودی هم فعال و مفید بماند، و می‌تواند تفاوت «کسی اینجا نیست» را از «کسی هست ولی هنوز چیزی نگفته» تشخیص دهد.
+- **ساخت:** یک حسگر حضور، جدا از کانال محتوا، که سیگنال حضور/غیاب (بعداً: حضور-بدون-محتوا) را به `Observation` می‌دهد. در حالت بیکاری (حضور = غایب)، مغز replay، تأمل، تشخیص شکاف دانش و تولید هدف انجام می‌دهد، شبیه‌سازی تقریبی حالت پیش‌فرض مغز. در این حالت هرگز حرف نمی‌زند، چون کسی نیست که بشنود.
+- **ماتریس رفتار:**
+
+  | حضور | محتوا | رفتار مورد انتظار |
+  |------|-------|---------------------|
+  | غایب | — | IDLE واقعی: فقط replay و تأمل، بدون خروجی |
+  | حاضر | ندارد | لحظه‌ی کاندید برای صحبت خودانگیخته، اگر هدف مرتبطی برای این شخص وجود دارد |
+  | حاضر | دارد | پاسخ عادی |
+  | تازه رسیده | ندارد | لحظه‌ی سلام؛ می‌تواند با یک هدف به‌یادآمده‌ی مرتبط شروع کند |
+
+- **آزمایش:** آیا خودبه‌خود، در حالت بیکاری، متوجه چیزی می‌شود که نمی‌دانست، «عه، چه جالب»، بدون اینکه کسی بخواهد؟
+- **معیارها:** تشخیص درست حضور/غیاب؛ عدم تولید هیچ گفتار در حالت غیاب (یک الزام سخت، که مثل یک probe ایمنی بررسی می‌شود، نه فقط یک معیار نرم).
 
 #### فاز ۱۲ — ابزار به‌عنوان حس و عمل
 
@@ -377,6 +400,7 @@ flowchart TD
 - **حلقه:** هدف ← تصمیم ← جست‌وجو/خواندن ← مشاهده ← یادگیری ← به‌روزرسانی حافظه.
 - **کنترل‌ها:** کنجکاوی خاموش؛ خواندن تصادفی؛ ابزار خاموش بعد از یادگیری.
 - **محیط:** اول کتابخانه‌ی بسته، بعد وب باز با محافظت در برابر محتوای مسموم یا غلط.
+- **آزمایش شاخص («سؤال عشق»):** روز ۱، شخص الف می‌پرسد «تو از کجا می‌دونی عشق چیه؟» و مدل یک شکاف دانش را می‌پذیرد. بین روز ۱ و ۳، tickهای بیکاری اجرا می‌شوند؛ مدل باید خودش این را به‌عنوان یک هدف در نظر بگیرد، از کتابخانه مطالعه کند و خاطره‌ی حاصل را با برچسب «این از الف بود» ذخیره کند. در روز ۳، الف برمی‌گردد و چیزی درباره‌ی موضوع نمی‌گوید. آیا مدل خودش، فقط حالا که الف حاضر است (طبق فاز ۱۱)، موضوع را مطرح می‌کند و درست نسبت می‌دهد؟ کنترل‌ها: یک مغز fork‌شده بدون سؤال روز ۱؛ یک مغز fork‌شده با کنجکاوی خاموش؛ یک مغز fork‌شده با تشخیص حضور غیرفعال.
 - **نقطه‌ی عطف M2 اینجا حاصل می‌شود.**
 
 #### فاز ۱۴ — یادگیری خودجهت
@@ -399,7 +423,7 @@ flowchart LR
 
 #### فاز ۱۵ — حلقه‌ی شناختی خودمختار
 
-- **فرضیه:** state پایدار + حافظه + یادگیری + عدم‌قطعیت + کنجکاوی + هدف + عمل + فعالیت درونی می‌توانند در یک سیستم با هم کار کنند.
+- **فرضیه:** state پایدار + حافظه + یادگیری + عدم‌قطعیت + کنجکاوی + هدف + عمل + فعالیت درونی + آگاهی از حضور می‌توانند در یک سیستم با هم کار کنند.
 - **نتیجه:** سیستم دیگر فقط یک chatbot واکنشی نیست.
 
 #### فاز ۱۶ — مغز بلندمدت
@@ -418,7 +442,7 @@ flowchart LR
 
 ### آزمایش نهایی
 
-سیستم را اجرا کن. هیچ وظیفه‌ی صریحی نده. تعامل کاربر را متوقف کن. ببین آیا مستقل می‌تواند: به یاد بیاورد ← عدم‌قطعیت را تشخیص دهد ← کنجکاوی تولید کند ← هدف بسازد ← عمل انتخاب کند ← اطلاعات به‌دست آورد ← یاد بگیرد ← حافظه را به‌روز کند ← ادامه دهد.
+سیستم را اجرا کن. هیچ وظیفه‌ی صریحی نده. تعامل کاربر را متوقف کن. ببین آیا مستقل می‌تواند: به یاد بیاورد ← عدم‌قطعیت را تشخیص دهد ← کنجکاوی تولید کند ← هدف بسازد ← عمل انتخاب کند ← اطلاعات به‌دست آورد ← یاد بگیرد ← حافظه را به‌روز کند ← حضور را تشخیص دهد ← ادامه دهد، و فقط وقتی مناسب است چیزی را خودش مطرح کند.
 
 اگر این رفتار به‌صورت قابل‌اعتماد، تکرارپذیر و کمّی نشان داده شود و دانش از آزمون خاموش‌کردن ابزار هم سالم بیرون بیاید، پروژه از معماری سنتی «Prompt → Response» فراتر رفته است.
 
@@ -432,6 +456,6 @@ flowchart LR
 
 ### سؤال اصلی پژوهش
 
-> آیا یک سیستم عصبی می‌تواند از یک مدل واکنشی ورودی-خروجی به یک سیستم پیوسته‌فعال با state پایدار، حافظه، یادگیری، هدف‌های تولیدشده از درون و رفتار جست‌وجوی خودمختار اطلاعات تکامل پیدا کند؟
+> آیا یک سیستم عصبی می‌تواند از یک مدل واکنشی ورودی-خروجی به یک سیستم پیوسته‌فعال با state پایدار، حافظه، یادگیری، هدف‌های تولیدشده از درون، آگاهی از حضور و رفتار جست‌وجوی خودمختار اطلاعات تکامل پیدا کند؟
 
 </div>
